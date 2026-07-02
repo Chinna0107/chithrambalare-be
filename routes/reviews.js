@@ -9,9 +9,10 @@ const sortReviews = (reviews) => [...reviews].sort((a, b) => new Date(b.date) - 
 router.get('/', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date FROM reviews ORDER BY date DESC');
+      const result = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status FROM reviews ORDER BY date DESC');
       const reviews = result.rows.map(r => ({
-        id: r.id, slug: r.slug, movieName: r.movie_name, poster: r.poster, rating: r.rating, snippet: r.snippet, verdict: r.verdict, story: r.story, performances: r.performances, technicalAspects: r.technical_aspects, verdictText: r.verdict_text, ottPlatform: r.ott_platform, ottReleaseDate: r.ott_release_date, date: r.date
+        id: r.id, slug: r.slug, movieName: r.movie_name, poster: r.poster, rating: r.rating, snippet: r.snippet, verdict: r.verdict, story: r.story, performances: r.performances, technicalAspects: r.technical_aspects, verdictText: r.verdict_text, ottPlatform: r.ott_platform, ottReleaseDate: r.ott_release_date, date: r.date,
+        director: r.director, producer: r.producer, productionHouse: r.production_house, language: r.language, genre: r.genre, releaseDate: r.release_date, runtime: r.runtime, trailer: r.trailer, status: r.status
       }));
       return res.json(reviews);
     } catch (e) { console.error('PG Reviews list query failed:', e.message); }
@@ -25,10 +26,10 @@ router.get('/:slug', async (req, res) => {
 
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date FROM reviews WHERE slug = $1', [slug]);
+      const result = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status FROM reviews WHERE slug = $1', [slug]);
       if (result.rows.length > 0) {
         const r = result.rows[0];
-        return res.json({ id: r.id, slug: r.slug, movieName: r.movie_name, poster: r.poster, rating: r.rating, snippet: r.snippet, verdict: r.verdict, story: r.story, performances: r.performances, technicalAspects: r.technical_aspects, verdictText: r.verdict_text, ottPlatform: r.ott_platform, ottReleaseDate: r.ott_release_date, date: r.date });
+        return res.json({ id: r.id, slug: r.slug, movieName: r.movie_name, poster: r.poster, rating: r.rating, snippet: r.snippet, verdict: r.verdict, story: r.story, performances: r.performances, technicalAspects: r.technical_aspects, verdictText: r.verdict_text, ottPlatform: r.ott_platform, ottReleaseDate: r.ott_release_date, date: r.date, director: r.director, producer: r.producer, productionHouse: r.production_house, language: r.language, genre: r.genre, releaseDate: r.release_date, runtime: r.runtime, trailer: r.trailer, status: r.status });
       }
     } catch (e) {
       console.error('PG Review detail lookup failed:', e.message);
@@ -52,8 +53,8 @@ router.post('/bulk', requireAdminPasscode, async (req, res) => {
       await client.query('BEGIN');
       await client.query('DELETE FROM reviews');
       for (const r of list) {
-        await client.query('INSERT INTO reviews (id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)',
-          [ String(r.id), r.slug, r.movieName, r.poster, r.rating, r.snippet, r.verdict, r.story, r.performances, r.technicalAspects, r.verdictText, r.ottPlatform, r.ottReleaseDate, r.date || new Date().toISOString() ]);
+        await client.query('INSERT INTO reviews (id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)',
+          [ String(r.id), r.slug, r.movieName, r.poster, r.rating, r.snippet, r.verdict, r.story, r.performances, r.technicalAspects, r.verdictText, r.ottPlatform, r.ottReleaseDate, r.date || new Date().toISOString(), r.director, r.producer, r.productionHouse, r.language, r.genre, r.releaseDate, r.runtime, r.trailer, r.status || 'published' ]);
       }
       await client.query('COMMIT');
       return res.json({ success: true });
@@ -82,8 +83,8 @@ router.post('/', requireAdminPasscode, async (req, res) => {
   const newId = r.id ? String(r.id) : Date.now().toString();
   if (pool) {
     try {
-      await pool.query('INSERT INTO reviews (id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)',
-        [ newId, r.slug, r.movieName, r.poster, r.rating, r.snippet, r.verdict, r.story, r.performances, r.technicalAspects, r.verdictText, r.ottPlatform, r.ottReleaseDate, r.date || new Date().toISOString() ]);
+      await pool.query('INSERT INTO reviews (id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)',
+        [ newId, r.slug, r.movieName, r.poster, r.rating, r.snippet, r.verdict, r.story, r.performances, r.technicalAspects, r.verdictText, r.ottPlatform, r.ottReleaseDate, r.date || new Date().toISOString(), r.director, r.producer, r.productionHouse, r.language, r.genre, r.releaseDate, r.runtime, r.trailer, r.status || 'published' ]);
       return res.json({ success: true, id: newId });
     } catch (e) {
       console.error('PG Review insert failed:', e.message);
@@ -103,8 +104,8 @@ router.put('/:id', requireAdminPasscode, async (req, res) => {
   const id = req.params.id; const r = req.body;
   if (pool) {
     try {
-      const result = await pool.query('UPDATE reviews SET slug=$1, movie_name=$2, poster=$3, rating=$4, snippet=$5, verdict=$6, story=$7, performances=$8, technical_aspects=$9, verdict_text=$10, ott_platform=$11, ott_release_date=$12, date=$13 WHERE id=$14',
-        [ r.slug, r.movieName, r.poster, r.rating, r.snippet, r.verdict, r.story, r.performances, r.technicalAspects, r.verdictText, r.ottPlatform, r.ottReleaseDate, r.date || new Date().toISOString(), id ]);
+      const result = await pool.query('UPDATE reviews SET slug=$1, movie_name=$2, poster=$3, rating=$4, snippet=$5, verdict=$6, story=$7, performances=$8, technical_aspects=$9, verdict_text=$10, ott_platform=$11, ott_release_date=$12, date=$13, director=$14, producer=$15, production_house=$16, language=$17, genre=$18, release_date=$19, runtime=$20, trailer=$21, status=$22 WHERE id=$23',
+        [ r.slug, r.movieName, r.poster, r.rating, r.snippet, r.verdict, r.story, r.performances, r.technicalAspects, r.verdictText, r.ottPlatform, r.ottReleaseDate, r.date || new Date().toISOString(), r.director, r.producer, r.productionHouse, r.language, r.genre, r.releaseDate, r.runtime, r.trailer, r.status || 'published', id ]);
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Review not found' });
       }

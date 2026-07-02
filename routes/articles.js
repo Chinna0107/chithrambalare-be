@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
       const result = await pool.query(query, [...params, limit, offset]);
       const posts = result.rows.map(r => ({
         id: r.id, slug: r.slug, title: r.title, excerpt: r.excerpt,
-        content: typeof r.content === 'string' ? JSON.parse(r.content) : r.content,
+        content: r.content,
         thumbnail: r.thumbnail, featuredImage: r.featured_image, date: r.date,
         category: r.category, author: r.author, tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags
       }));
@@ -94,7 +94,7 @@ router.get('/:slug', async (req, res) => {
         const r = result.rows[0];
         return res.json({
           id: r.id, slug: r.slug, title: r.title, excerpt: r.excerpt,
-          content: typeof r.content === 'string' ? JSON.parse(r.content) : r.content,
+          content: r.content,
           thumbnail: r.thumbnail, featuredImage: r.featured_image, date: r.date,
           category: r.category, author: r.author, tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags
         });
@@ -123,7 +123,7 @@ router.post('/bulk', requireAdminPasscode, async (req, res) => {
       for (const a of list) {
         await client.query(
           'INSERT INTO articles (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-          [ String(a.id), a.slug, a.title, a.excerpt, JSON.stringify(a.content || []), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []) ]
+          [ String(a.id), a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []) ]
         );
       }
       await client.query('COMMIT');
@@ -154,7 +154,7 @@ router.post('/', requireAdminPasscode, async (req, res) => {
   if (pool) {
     try {
       await pool.query('INSERT INTO articles (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [ newId, a.slug, a.title, a.excerpt, JSON.stringify(a.content || []), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []) ]);
+        [ newId, a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []) ]);
       return res.json({ success: true, id: newId });
     } catch (e) {
       console.error('PG Article insert failed:', e.message);
@@ -175,7 +175,7 @@ router.put('/:id', requireAdminPasscode, async (req, res) => {
   if (pool) {
     try {
       const result = await pool.query('UPDATE articles SET slug=$1, title=$2, excerpt=$3, content=$4, thumbnail=$5, featured_image=$6, date=$7, category=$8, author=$9, tags=$10 WHERE id=$11',
-        [ a.slug, a.title, a.excerpt, JSON.stringify(a.content || []), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), id ]);
+        [ a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), id ]);
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Article not found' });
       }

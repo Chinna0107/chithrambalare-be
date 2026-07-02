@@ -14,33 +14,66 @@ router.get('/verify', requireAdminPasscode, (req, res) => {
 router.get('/db', requireAdminPasscode, async (req, res) => {
   if (pool) {
     try {
-      const popupRes = await pool.query('SELECT active, title, image_url, link_url, button_text FROM popup_ad ORDER BY id DESC LIMIT 1');
-      const schedulesRes = await pool.query('SELECT id, movie_name, release_date, language, status FROM schedules ORDER BY release_date ASC');
-      const naRes = await pool.query('SELECT id, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster FROM north_america ORDER BY id ASC');
+      const popupRes = await pool.query('SELECT active, title, image_desktop, image_mobile, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay FROM popup_ad ORDER BY id DESC LIMIT 1');
+      const schedulesRes = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
+      const naRes = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes FROM north_america ORDER BY id ASC');
       const bo5Res = await pool.query('SELECT rank, movie_name, gross, verdict, trend FROM box_office_top5 ORDER BY rank ASC');
       const galleriesRes = await pool.query('SELECT id, title, cover_image, images, date FROM galleries ORDER BY id ASC');
       const articlesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags FROM articles ORDER BY date DESC');
-      const reviewsRes = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date FROM reviews ORDER BY date DESC');
+      const reviewsRes = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status FROM reviews ORDER BY date DESC');
       const boRes = await pool.query('SELECT id, slug, movie_name, director, movie_cast, poster, day_collection, worldwide_gross, india_net, india_gross, overseas, verdict, trend, days, languages, percentage, date, daily_breakdown, budget, total_india_net, us_premieres FROM box_office ORDER BY date DESC');
+      const taxonomyRes = await pool.query('SELECT id, type, name, slug, description FROM taxonomy ORDER BY id ASC');
+      const landingPageRes = await pool.query('SELECT id, active, banner_url, heading, description, cta_text, cta_url FROM landing_page ORDER BY id DESC LIMIT 1');
+      const monetizationAdsRes = await pool.query('SELECT id, placement, active, script_code, image_url, link_url FROM monetization_ads ORDER BY id ASC');
+      const commentsRes = await pool.query('SELECT id, entity_type, entity_id, user_name, comment_text, status, date FROM comments ORDER BY date DESC');
+      const mediaLibraryRes = await pool.query('SELECT id, file_name, file_url, file_type, size, date FROM media_library ORDER BY date DESC');
+      const settingsRes = await pool.query('SELECT site_name, logo_url, maintenance_mode, social_links FROM settings ORDER BY id DESC LIMIT 1');
+      const analyticsRes = await pool.query('SELECT bounce_rate, most_viewed_articles, most_viewed_reviews, top_performing_pages, recent_activity FROM analytics ORDER BY id DESC LIMIT 1');
+      
+      const totalVisRes = await pool.query('SELECT COUNT(DISTINCT visitor_id) FROM visitor_logs');
+      const dailyVisRes = await pool.query("SELECT COUNT(DISTINCT visitor_id) FROM visitor_logs WHERE created_at >= NOW() - INTERVAL '1 day'");
+      const weeklyVisRes = await pool.query("SELECT COUNT(DISTINCT visitor_id) FROM visitor_logs WHERE created_at >= NOW() - INTERVAL '7 days'");
+      const monthlyVisRes = await pool.query("SELECT COUNT(DISTINCT visitor_id) FROM visitor_logs WHERE created_at >= NOW() - INTERVAL '30 days'");
+      const pageViewsRes = await pool.query('SELECT COUNT(*) FROM visitor_logs');
       
       const db = {
-        settings: {},
+        settings: settingsRes.rows[0] ? {
+          siteName: settingsRes.rows[0].site_name,
+          logoUrl: settingsRes.rows[0].logo_url,
+          maintenanceMode: settingsRes.rows[0].maintenance_mode,
+          socialLinks: typeof settingsRes.rows[0].social_links === 'string' ? JSON.parse(settingsRes.rows[0].social_links) : settingsRes.rows[0].social_links
+        } : {},
         popupAd: popupRes.rows[0] ? {
           active: popupRes.rows[0].active,
           title: popupRes.rows[0].title,
-          imageUrl: popupRes.rows[0].image_url,
-          linkUrl: popupRes.rows[0].link_url,
-          buttonText: popupRes.rows[0].button_text
+          imageDesktop: popupRes.rows[0].image_desktop,
+          imageMobile: popupRes.rows[0].image_mobile,
+          redirectUrl: popupRes.rows[0].redirect_url,
+          scheduleStart: popupRes.rows[0].schedule_start,
+          scheduleEnd: popupRes.rows[0].schedule_end,
+          closeTimer: popupRes.rows[0].close_timer,
+          autoClose: popupRes.rows[0].auto_close,
+          displayRule: popupRes.rows[0].display_rule,
+          displayDelay: popupRes.rows[0].display_delay
         } : { active: false },
         upcomingSchedules: schedulesRes.rows.map(r => ({
           id: r.id,
           movieName: r.movie_name,
           releaseDate: r.release_date,
           language: r.language,
-          status: r.status
+          status: r.status,
+          banner: r.banner,
+          director: r.director,
+          castList: r.cast_list,
+          genre: r.genre,
+          releaseStatus: r.release_status,
+          trailerLink: r.trailer_link,
+          notes: r.notes,
+          slug: r.slug
         })),
         northAmericaCollections: naRes.rows.map(r => ({
           id: r.id,
+          slug: r.slug,
           movieName: r.movie_name,
           hourlyGross: r.hourly_gross,
           totalGross: r.total_gross,
@@ -48,7 +81,19 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           screens: r.screens,
           status: r.status,
           lastUpdated: r.last_updated,
-          poster: r.poster
+          poster: r.poster,
+          releaseDate: r.release_date,
+          language: r.language,
+          distributor: r.distributor,
+          genre: r.genre,
+          budget: r.budget,
+          openingDayPreview: r.opening_day_preview,
+          advanceBookings: r.advance_bookings,
+          premiereCollections: r.premiere_collections,
+          weekendCollections: r.weekend_collections,
+          weeklyCollections: r.weekly_collections,
+          dailyBreakdown: r.daily_breakdown,
+          notes: r.notes
         })),
         boxOfficeTop5: bo5Res.rows.map(r => ({
           rank: r.rank,
@@ -69,7 +114,7 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           slug: r.slug,
           title: r.title,
           excerpt: r.excerpt,
-          content: typeof r.content === 'string' ? JSON.parse(r.content) : r.content,
+          content: r.content,
           thumbnail: r.thumbnail,
           featuredImage: r.featured_image,
           date: r.date,
@@ -91,7 +136,16 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           verdictText: r.verdict_text,
           ottPlatform: r.ott_platform,
           ottReleaseDate: r.ott_release_date,
-          date: r.date
+          date: r.date,
+          director: r.director,
+          producer: r.producer,
+          productionHouse: r.production_house,
+          language: r.language,
+          genre: r.genre,
+          releaseDate: r.release_date,
+          runtime: r.runtime,
+          trailer: r.trailer,
+          status: r.status
         })),
         boxOffice: boRes.rows.map(r => ({
           id: r.id,
@@ -115,21 +169,85 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           budget: r.budget,
           totalIndiaNet: r.total_india_net,
           usPremieres: r.us_premieres
-        }))
+        })),
+        taxonomy: taxonomyRes.rows,
+        landingPage: landingPageRes.rows[0] ? {
+          active: landingPageRes.rows[0].active,
+          bannerUrl: landingPageRes.rows[0].banner_url,
+          heading: landingPageRes.rows[0].heading,
+          description: landingPageRes.rows[0].description,
+          ctaText: landingPageRes.rows[0].cta_text,
+          ctaUrl: landingPageRes.rows[0].cta_url
+        } : { active: false },
+        monetizationAds: monetizationAdsRes.rows.map(r => ({
+          id: r.id,
+          placement: r.placement,
+          active: r.active,
+          scriptCode: r.script_code,
+          imageUrl: r.image_url,
+          linkUrl: r.link_url
+        })),
+        comments: commentsRes.rows.map(r => ({
+          id: r.id,
+          entityType: r.entity_type,
+          entityId: r.entity_id,
+          userName: r.user_name,
+          commentText: r.comment_text,
+          status: r.status,
+          date: r.date
+        })),
+        mediaLibrary: mediaLibraryRes.rows.map(r => ({
+          id: r.id,
+          fileName: r.file_name,
+          fileUrl: r.file_url,
+          fileType: r.file_type,
+          size: r.size,
+          date: r.date
+        })),
+        analytics: analyticsRes.rows[0] ? {
+          totalVisitors: totalVisRes.rows[0].count,
+          dailyVisitors: dailyVisRes.rows[0].count,
+          weeklyVisitors: weeklyVisRes.rows[0].count,
+          monthlyVisitors: monthlyVisRes.rows[0].count,
+          pageViews: pageViewsRes.rows[0].count,
+          bounceRate: analyticsRes.rows[0].bounce_rate,
+          mostViewedArticles: typeof analyticsRes.rows[0].most_viewed_articles === 'string' ? JSON.parse(analyticsRes.rows[0].most_viewed_articles) : analyticsRes.rows[0].most_viewed_articles,
+          mostViewedReviews: typeof analyticsRes.rows[0].most_viewed_reviews === 'string' ? JSON.parse(analyticsRes.rows[0].most_viewed_reviews) : analyticsRes.rows[0].most_viewed_reviews,
+          topPerformingPages: typeof analyticsRes.rows[0].top_performing_pages === 'string' ? JSON.parse(analyticsRes.rows[0].top_performing_pages) : analyticsRes.rows[0].top_performing_pages,
+          recentActivity: typeof analyticsRes.rows[0].recent_activity === 'string' ? JSON.parse(analyticsRes.rows[0].recent_activity) : analyticsRes.rows[0].recent_activity
+        } : {}
       };
       return res.json(db);
     } catch (e) {
       console.error('PG GET /api/admin/db failed:', e.message);
     }
   }
-  res.json(readDb());
+  
+  const db = readDb();
+  const logs = db.visitorLogs || [];
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+  
+  const uniqueTotal = new Set(logs.map(l => l.visitor_id)).size;
+  const uniqueDaily = new Set(logs.filter(l => now - new Date(l.created_at).getTime() < oneDay).map(l => l.visitor_id)).size;
+  const uniqueWeekly = new Set(logs.filter(l => now - new Date(l.created_at).getTime() < oneDay * 7).map(l => l.visitor_id)).size;
+  const uniqueMonthly = new Set(logs.filter(l => now - new Date(l.created_at).getTime() < oneDay * 30).map(l => l.visitor_id)).size;
+  
+  if (!db.analytics) db.analytics = {};
+  db.analytics.totalVisitors = uniqueTotal.toString();
+  db.analytics.dailyVisitors = uniqueDaily.toString();
+  db.analytics.weeklyVisitors = uniqueWeekly.toString();
+  db.analytics.monthlyVisitors = uniqueMonthly.toString();
+  db.analytics.pageViews = logs.length.toString();
+  
+  res.json(db);
 });
 
 router.post('/db/reset', requireAdminPasscode, async (req, res) => {
   if (pool) {
     try {
       console.log('Resetting PG Database tables...');
-      await pool.query('DROP TABLE IF EXISTS settings, popup_ad, schedules, north_america, box_office_top5, articles, reviews, box_office, galleries CASCADE');
+      await pool.query('DROP TABLE IF EXISTS settings, popup_ad, schedules, north_america, box_office_top5, articles, reviews, box_office, galleries, taxonomy, landing_page, monetization_ads, comments, media_library, analytics, visitor_logs CASCADE');
       await initDb();
       return res.json({ success: true });
     } catch (e) {
@@ -152,15 +270,23 @@ router.post('/db/reset', requireAdminPasscode, async (req, res) => {
 router.get('/popup-ad', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT active, title, image_url, link_url, button_text FROM popup_ad ORDER BY id DESC LIMIT 1');
+      const result = await pool.query('SELECT active, title, image_desktop, image_mobile, image_url, button_text, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay FROM popup_ad ORDER BY id DESC LIMIT 1');
       if (result.rows.length > 0) {
         const ad = result.rows[0];
         return res.json({
           active: ad.active,
           title: ad.title,
+          imageDesktop: ad.image_desktop,
+          imageMobile: ad.image_mobile,
           imageUrl: ad.image_url,
-          linkUrl: ad.link_url,
-          buttonText: ad.button_text
+          buttonText: ad.button_text,
+          redirectUrl: ad.redirect_url,
+          scheduleStart: ad.schedule_start,
+          scheduleEnd: ad.schedule_end,
+          closeTimer: ad.close_timer,
+          autoClose: ad.auto_close,
+          displayRule: ad.display_rule,
+          displayDelay: ad.display_delay
         });
       }
     } catch (e) {
@@ -177,8 +303,8 @@ router.post('/popup-ad', requireAdminPasscode, async (req, res) => {
     try {
       await pool.query('DELETE FROM popup_ad');
       await pool.query(
-        'INSERT INTO popup_ad (active, title, image_url, link_url, button_text) VALUES ($1, $2, $3, $4, $5)',
-        [ad.active, ad.title, ad.imageUrl, ad.linkUrl, ad.buttonText]
+        'INSERT INTO popup_ad (active, title, image_desktop, image_mobile, image_url, button_text, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
+        [ad.active, ad.title, ad.imageDesktop, ad.imageMobile, ad.imageUrl, ad.buttonText, ad.redirectUrl, ad.scheduleStart || null, ad.scheduleEnd || null, ad.closeTimer || 0, ad.autoClose || false, ad.displayRule || 'every_visit', ad.displayDelay || 0]
       );
       return res.json({ success: true, popupAd: ad });
     } catch (e) {

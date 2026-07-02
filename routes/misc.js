@@ -15,6 +15,34 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date() });
 });
 
+router.post('/track-visit', async (req, res) => {
+  const { visitorId, path: pagePath } = req.body;
+  if (!visitorId) return res.status(400).json({ error: 'visitorId required' });
+  
+  if (pool) {
+    try {
+      await pool.query(
+        'INSERT INTO visitor_logs (visitor_id, path) VALUES ($1, $2)',
+        [visitorId, pagePath || '/']
+      );
+      return res.json({ success: true });
+    } catch (e) {
+      console.error('PG track-visit failed:', e.message);
+      return res.status(500).json({ error: 'db error' });
+    }
+  }
+
+  try {
+    const db = readDb();
+    if (!db.visitorLogs) db.visitorLogs = [];
+    db.visitorLogs.push({ visitor_id: visitorId, path: pagePath || '/', created_at: new Date().toISOString() });
+    writeDb(db);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'json db error' });
+  }
+});
+
 router.get('/image-proxy', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*'); 
   let imageUrl = req.query.url;
@@ -90,13 +118,21 @@ router.get('/imdb-image', async (req, res) => {
 router.get('/schedules', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, movie_name, release_date, language, status FROM schedules ORDER BY release_date ASC');
+      const result = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
       const schedules = result.rows.map(r => ({
         id: r.id,
         movieName: r.movie_name,
         releaseDate: r.release_date,
         language: r.language,
-        status: r.status
+        status: r.status,
+        banner: r.banner,
+        director: r.director,
+        castList: r.cast_list,
+        genre: r.genre,
+        releaseStatus: r.release_status,
+        trailerLink: r.trailer_link,
+        notes: r.notes,
+        slug: r.slug
       }));
       return res.json(schedules);
     } catch (e) {
@@ -107,6 +143,28 @@ router.get('/schedules', async (req, res) => {
   res.json(db.upcomingSchedules || []);
 });
 
+router.get('/schedules/:slug', async (req, res) => {
+  const { slug } = req.params;
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules WHERE slug = $1 OR id::text = $1', [slug]);
+      if (result.rows.length > 0) {
+        const r = result.rows[0];
+        return res.json({
+          id: r.id, movieName: r.movie_name, releaseDate: r.release_date, language: r.language, status: r.status,
+          banner: r.banner, director: r.director, castList: r.cast_list, genre: r.genre, releaseStatus: r.release_status,
+          trailerLink: r.trailer_link, notes: r.notes, slug: r.slug
+        });
+      }
+      return res.status(404).json({ error: 'Not found' });
+    } catch (e) { console.error('PG Schedule read single failed:', e.message); }
+  }
+  const db = readDb();
+  const item = (db.upcomingSchedules || []).find(n => n.slug === slug || String(n.id) === slug);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  return res.json(item);
+});
+
 router.post('/schedules', requireAdminPasscode, async (req, res) => {
   const list = req.body;
   if (pool) {
@@ -114,11 +172,11 @@ router.post('/schedules', requireAdminPasscode, async (req, res) => {
       await pool.query('DELETE FROM schedules');
       for (const s of list) {
         await pool.query(
-          'INSERT INTO schedules (movie_name, release_date, language, status) VALUES ($1, $2, $3, $4)',
-          [s.movieName, s.releaseDate, s.language, s.status]
+          'INSERT INTO schedules (movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
+          [s.movieName, s.releaseDate, s.language, s.status, s.banner, s.director, s.castList, s.genre, s.releaseStatus, s.trailerLink, s.notes, s.slug]
         );
       }
-      const result = await pool.query('SELECT id, movie_name, release_date, language, status FROM schedules ORDER BY release_date ASC');
+      const result = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
       return res.json({
         success: true,
         upcomingSchedules: result.rows.map(r => ({
@@ -126,7 +184,15 @@ router.post('/schedules', requireAdminPasscode, async (req, res) => {
           movieName: r.movie_name,
           releaseDate: r.release_date,
           language: r.language,
-          status: r.status
+          status: r.status,
+          banner: r.banner,
+          director: r.director,
+          castList: r.cast_list,
+          genre: r.genre,
+          releaseStatus: r.release_status,
+          trailerLink: r.trailer_link,
+          notes: r.notes,
+          slug: r.slug
         }))
       });
     } catch (e) {
@@ -147,9 +213,10 @@ router.post('/schedules', requireAdminPasscode, async (req, res) => {
 router.get('/north-america', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster FROM north_america ORDER BY id ASC');
+      const result = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes FROM north_america ORDER BY id ASC');
       const collections = result.rows.map(r => ({
         id: r.id,
+        slug: r.slug,
         movieName: r.movie_name,
         hourlyGross: r.hourly_gross,
         totalGross: r.total_gross,
@@ -157,7 +224,19 @@ router.get('/north-america', async (req, res) => {
         screens: r.screens,
         status: r.status,
         lastUpdated: r.last_updated,
-        poster: r.poster
+        poster: r.poster,
+        releaseDate: r.release_date,
+        language: r.language,
+        distributor: r.distributor,
+        genre: r.genre,
+        budget: r.budget,
+        openingDayPreview: r.opening_day_preview,
+        advanceBookings: r.advance_bookings,
+        premiereCollections: r.premiere_collections,
+        weekendCollections: r.weekend_collections,
+        weeklyCollections: r.weekly_collections,
+        dailyBreakdown: r.daily_breakdown,
+        notes: r.notes
       }));
       return res.json(collections);
     } catch (e) {
@@ -168,6 +247,30 @@ router.get('/north-america', async (req, res) => {
   res.json(db.northAmericaCollections || []);
 });
 
+router.get('/north-america/:slug', async (req, res) => {
+  const { slug } = req.params;
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes FROM north_america WHERE slug = $1 OR id::text = $1', [slug]);
+      if (result.rows.length > 0) {
+        const r = result.rows[0];
+        return res.json({
+          id: r.id, slug: r.slug, movieName: r.movie_name, hourlyGross: r.hourly_gross, totalGross: r.total_gross,
+          premierGross: r.premier_gross, screens: r.screens, status: r.status, lastUpdated: r.last_updated, poster: r.poster,
+          releaseDate: r.release_date, language: r.language, distributor: r.distributor, genre: r.genre, budget: r.budget,
+          openingDayPreview: r.opening_day_preview, advanceBookings: r.advance_bookings, premiereCollections: r.premiere_collections,
+          weekendCollections: r.weekend_collections, weeklyCollections: r.weekly_collections, dailyBreakdown: r.daily_breakdown, notes: r.notes
+        });
+      }
+      return res.status(404).json({ error: 'Not found' });
+    } catch (e) { console.error('PG NA read single failed:', e.message); }
+  }
+  const db = readDb();
+  const item = (db.northAmericaCollections || []).find(n => n.slug === slug || String(n.id) === slug);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  return res.json(item);
+});
+
 router.post('/north-america', requireAdminPasscode, async (req, res) => {
   const list = req.body;
   if (pool) {
@@ -175,15 +278,16 @@ router.post('/north-america', requireAdminPasscode, async (req, res) => {
       await pool.query('DELETE FROM north_america');
       for (const n of list) {
         await pool.query(
-          'INSERT INTO north_america (movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-          [n.movieName, n.hourlyGross, n.totalGross, n.premierGross, n.screens, n.status, n.lastUpdated, n.poster]
+          'INSERT INTO north_america (slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)',
+          [n.slug, n.movieName, n.hourlyGross, n.totalGross, n.premierGross, n.screens, n.status, n.lastUpdated, n.poster, n.releaseDate, n.language, n.distributor, n.genre, n.budget, n.openingDayPreview, n.advanceBookings, n.premiereCollections, n.weekendCollections, n.weeklyCollections, JSON.stringify(n.dailyBreakdown || []), n.notes]
         );
       }
-      const result = await pool.query('SELECT id, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster FROM north_america ORDER BY id ASC');
+      const result = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes FROM north_america ORDER BY id ASC');
       return res.json({
         success: true,
         northAmericaCollections: result.rows.map(r => ({
           id: r.id,
+          slug: r.slug,
           movieName: r.movie_name,
           hourlyGross: r.hourly_gross,
           totalGross: r.total_gross,
@@ -191,7 +295,19 @@ router.post('/north-america', requireAdminPasscode, async (req, res) => {
           screens: r.screens,
           status: r.status,
           lastUpdated: r.last_updated,
-          poster: r.poster
+          poster: r.poster,
+          releaseDate: r.release_date,
+          language: r.language,
+          distributor: r.distributor,
+          genre: r.genre,
+          budget: r.budget,
+          openingDayPreview: r.opening_day_preview,
+          advanceBookings: r.advance_bookings,
+          premiereCollections: r.premiere_collections,
+          weekendCollections: r.weekend_collections,
+          weeklyCollections: r.weekly_collections,
+          dailyBreakdown: r.daily_breakdown,
+          notes: r.notes
         }))
       });
     } catch (e) {
@@ -212,13 +328,18 @@ router.post('/north-america', requireAdminPasscode, async (req, res) => {
 router.get('/box-office-top5', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT rank, movie_name, gross, verdict, trend FROM box_office_top5 ORDER BY rank ASC');
+      const result = await pool.query('SELECT rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated FROM box_office_top5 ORDER BY rank ASC');
       const top5 = result.rows.map(r => ({
         rank: r.rank,
         movieName: r.movie_name,
         gross: r.gross,
         verdict: r.verdict,
-        trend: r.trend
+        trend: r.trend,
+        openingCollection: r.opening_collection,
+        weekendCollection: r.weekend_collection,
+        totalCollection: r.total_collection,
+        territory: r.territory,
+        lastUpdated: r.last_updated
       }));
       return res.json(top5);
     } catch (e) {
@@ -236,11 +357,11 @@ router.post('/box-office-top5', requireAdminPasscode, async (req, res) => {
       await pool.query('DELETE FROM box_office_top5');
       for (const b of list) {
         await pool.query(
-          'INSERT INTO box_office_top5 (rank, movie_name, gross, verdict, trend) VALUES ($1, $2, $3, $4, $5)',
-          [b.rank, b.movieName, b.gross, b.verdict, b.trend]
+          'INSERT INTO box_office_top5 (rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+          [b.rank, b.movieName, b.gross, b.verdict, b.trend, b.openingCollection, b.weekendCollection, b.totalCollection, b.territory, b.lastUpdated]
         );
       }
-      const result = await pool.query('SELECT rank, movie_name, gross, verdict, trend FROM box_office_top5 ORDER BY rank ASC');
+      const result = await pool.query('SELECT rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated FROM box_office_top5 ORDER BY rank ASC');
       return res.json({
         success: true,
         boxOfficeTop5: result.rows.map(r => ({
@@ -248,7 +369,12 @@ router.post('/box-office-top5', requireAdminPasscode, async (req, res) => {
           movieName: r.movie_name,
           gross: r.gross,
           verdict: r.verdict,
-          trend: r.trend
+          trend: r.trend,
+          openingCollection: r.opening_collection,
+          weekendCollection: r.weekend_collection,
+          totalCollection: r.total_collection,
+          territory: r.territory,
+          lastUpdated: r.last_updated
         }))
       });
     } catch (e) {
@@ -321,6 +447,162 @@ router.post('/galleries', requireAdminPasscode, async (req, res) => {
     console.error('Failed to update galleries:', err.message);
     res.status(500).json({ error: 'Failed to save galleries' });
   }
+});
+
+// Individual schedule CRUD
+router.post('/schedules/single', requireAdminPasscode, async (req, res) => {
+  const { movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `INSERT INTO schedules (movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, seo_title, meta_description, meta_keywords, slug, canonical_url, og_title, og_description, og_image)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+        [movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus || 'upcoming', trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage]
+      );
+      return res.json({ success: true, item: result.rows[0] });
+    } catch (e) { console.error('PG schedule add failed:', e.message); return res.status(500).json({ error: 'Failed to add schedule' }); }
+  }
+  const db = readDb();
+  if (!db.upcomingSchedules) db.upcomingSchedules = [];
+  const newItem = { id: Date.now(), ...req.body };
+  db.upcomingSchedules.push(newItem);
+  writeDb(db);
+  res.json({ success: true, item: newItem });
+});
+
+router.put('/schedules/:id', requireAdminPasscode, async (req, res) => {
+  const { id } = req.params;
+  const { movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `UPDATE schedules SET movie_name=$1, release_date=$2, language=$3, status=$4, banner=$5, director=$6, cast_list=$7, genre=$8, release_status=$9, trailer_link=$10, notes=$11, seo_title=$12, meta_description=$13, meta_keywords=$14, slug=$15, canonical_url=$16, og_title=$17, og_description=$18, og_image=$19 WHERE id=$20 RETURNING *`,
+        [movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage, id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Schedule not found' });
+      return res.json({ success: true });
+    } catch (e) { console.error('PG schedule update failed:', e.message); return res.status(500).json({ error: 'Failed to update' }); }
+  }
+  const db = readDb();
+  const idx = (db.upcomingSchedules || []).findIndex(s => String(s.id) === String(id));
+  if (idx >= 0) { db.upcomingSchedules[idx] = { ...db.upcomingSchedules[idx], ...req.body }; writeDb(db); }
+  res.json({ success: true });
+});
+
+router.delete('/schedules/:id', requireAdminPasscode, async (req, res) => {
+  const { id } = req.params;
+  if (pool) {
+    try {
+      await pool.query('DELETE FROM schedules WHERE id=$1', [id]);
+      return res.json({ success: true });
+    } catch (e) { console.error('PG schedule delete failed:', e.message); }
+  }
+  const db = readDb();
+  db.upcomingSchedules = (db.upcomingSchedules || []).filter(s => String(s.id) !== String(id));
+  writeDb(db);
+  res.json({ success: true });
+});
+
+// Individual north-america CRUD
+router.post('/north-america/single', requireAdminPasscode, async (req, res) => {
+  const b = req.body;
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `INSERT INTO north_america (movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes, seo_title, meta_description, meta_keywords, canonical_url, slug, og_title, og_description, og_image, twitter_card, robots)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30) RETURNING *`,
+        [b.movieName, b.hourlyGross, b.totalGross, b.premierGross, b.screens, b.status, b.lastUpdated, b.poster, b.releaseDate, b.language, b.distributor, b.genre, b.budget, b.openingDayPreview, b.advanceBookings, b.premiereCollections, b.weekendCollections, b.weeklyCollections, JSON.stringify(b.dailyBreakdown || []), b.notes, b.seoTitle, b.metaDescription, b.metaKeywords, b.canonicalUrl, b.slug, b.ogTitle, b.ogDescription, b.ogImage, b.twitterCard, b.robots || 'index,follow']
+      );
+      return res.json({ success: true, item: result.rows[0] });
+    } catch (e) { console.error('PG NA add failed:', e.message); return res.status(500).json({ error: 'Failed to add' }); }
+  }
+  const db = readDb();
+  if (!db.northAmericaCollections) db.northAmericaCollections = [];
+  db.northAmericaCollections.push({ id: Date.now(), ...req.body });
+  writeDb(db);
+  res.json({ success: true });
+});
+
+router.put('/north-america/:id', requireAdminPasscode, async (req, res) => {
+  const { id } = req.params;
+  const b = req.body;
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `UPDATE north_america SET movie_name=$1, hourly_gross=$2, total_gross=$3, premier_gross=$4, screens=$5, status=$6, last_updated=$7, poster=$8, release_date=$9, language=$10, distributor=$11, genre=$12, budget=$13, opening_day_preview=$14, advance_bookings=$15, premiere_collections=$16, weekend_collections=$17, weekly_collections=$18, daily_breakdown=$19, notes=$20, seo_title=$21, meta_description=$22, meta_keywords=$23, canonical_url=$24, slug=$25, og_title=$26, og_description=$27, og_image=$28, twitter_card=$29, robots=$30 WHERE id=$31`,
+        [b.movieName, b.hourlyGross, b.totalGross, b.premierGross, b.screens, b.status, b.lastUpdated, b.poster, b.releaseDate, b.language, b.distributor, b.genre, b.budget, b.openingDayPreview, b.advanceBookings, b.premiereCollections, b.weekendCollections, b.weeklyCollections, JSON.stringify(b.dailyBreakdown || []), b.notes, b.seoTitle, b.metaDescription, b.metaKeywords, b.canonicalUrl, b.slug, b.ogTitle, b.ogDescription, b.ogImage, b.twitterCard, b.robots, id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+      return res.json({ success: true });
+    } catch (e) { console.error('PG NA update failed:', e.message); return res.status(500).json({ error: 'Failed to update' }); }
+  }
+  const db = readDb();
+  const idx = (db.northAmericaCollections || []).findIndex(n => String(n.id) === String(id));
+  if (idx >= 0) { db.northAmericaCollections[idx] = { ...db.northAmericaCollections[idx], ...req.body }; writeDb(db); }
+  res.json({ success: true });
+});
+
+router.delete('/north-america/:id', requireAdminPasscode, async (req, res) => {
+  const { id } = req.params;
+  if (pool) {
+    try { await pool.query('DELETE FROM north_america WHERE id=$1', [id]); return res.json({ success: true }); }
+    catch (e) { console.error('PG NA delete failed:', e.message); }
+  }
+  const db = readDb();
+  db.northAmericaCollections = (db.northAmericaCollections || []).filter(n => String(n.id) !== String(id));
+  writeDb(db);
+  res.json({ success: true });
+});
+
+// Individual gallery CRUD
+router.post('/galleries/single', requireAdminPasscode, async (req, res) => {
+  const b = req.body;
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `INSERT INTO galleries (title, cover_image, images, date, category, alt_text, caption, photographer_credit, featured_image, sort_order, seo_title, meta_description, slug, canonical_url, og_image)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        [b.title, b.coverImage, JSON.stringify(b.images || []), b.date || new Date().toISOString(), b.category || 'stills', b.altText, b.caption, b.photographerCredit, b.featuredImage, b.sortOrder || 0, b.seoTitle, b.metaDescription, b.slug, b.canonicalUrl, b.ogImage]
+      );
+      return res.json({ success: true, item: result.rows[0] });
+    } catch (e) { console.error('PG gallery add failed:', e.message); return res.status(500).json({ error: 'Failed to add gallery' }); }
+  }
+  const db = readDb();
+  if (!db.galleries) db.galleries = [];
+  db.galleries.push({ id: Date.now(), ...req.body });
+  writeDb(db);
+  res.json({ success: true });
+});
+
+router.put('/galleries/:id', requireAdminPasscode, async (req, res) => {
+  const { id } = req.params;
+  const b = req.body;
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `UPDATE galleries SET title=$1, cover_image=$2, images=$3, date=$4, category=$5, alt_text=$6, caption=$7, photographer_credit=$8, featured_image=$9, sort_order=$10, seo_title=$11, meta_description=$12, slug=$13, canonical_url=$14, og_image=$15 WHERE id=$16`,
+        [b.title, b.coverImage, JSON.stringify(b.images || []), b.date, b.category, b.altText, b.caption, b.photographerCredit, b.featuredImage, b.sortOrder, b.seoTitle, b.metaDescription, b.slug, b.canonicalUrl, b.ogImage, id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+      return res.json({ success: true });
+    } catch (e) { console.error('PG gallery update failed:', e.message); return res.status(500).json({ error: 'Failed to update' }); }
+  }
+  const db = readDb();
+  const idx = (db.galleries || []).findIndex(g => String(g.id) === String(id));
+  if (idx >= 0) { db.galleries[idx] = { ...db.galleries[idx], ...req.body }; writeDb(db); }
+  res.json({ success: true });
+});
+
+router.delete('/galleries/:id', requireAdminPasscode, async (req, res) => {
+  const { id } = req.params;
+  if (pool) {
+    try { await pool.query('DELETE FROM galleries WHERE id=$1', [id]); return res.json({ success: true }); }
+    catch (e) { console.error('PG gallery delete failed:', e.message); }
+  }
+  const db = readDb();
+  db.galleries = (db.galleries || []).filter(g => String(g.id) !== String(id));
+  writeDb(db);
+  res.json({ success: true });
 });
 
 module.exports = router;
