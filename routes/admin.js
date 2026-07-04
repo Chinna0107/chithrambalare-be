@@ -15,13 +15,13 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
   if (pool) {
     try {
       const popupRes = await pool.query('SELECT active, title, image_desktop, image_mobile, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay FROM popup_ad ORDER BY id DESC LIMIT 1');
-      const schedulesRes = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
-      const naRes = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes FROM north_america ORDER BY id ASC');
-      const bo5Res = await pool.query('SELECT rank, movie_name, gross, verdict, trend FROM box_office_top5 ORDER BY rank ASC');
-      const galleriesRes = await pool.query('SELECT id, title, cover_image, images, date FROM galleries ORDER BY id ASC');
-      const articlesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags FROM articles ORDER BY date DESC');
-      const reviewsRes = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status FROM reviews ORDER BY date DESC');
-      const boRes = await pool.query('SELECT id, slug, movie_name, director, movie_cast, poster, day_collection, worldwide_gross, india_net, india_gross, overseas, verdict, trend, days, languages, percentage, date, daily_breakdown, budget, total_india_net, us_premieres FROM box_office ORDER BY date DESC');
+      const schedulesRes = await pool.query('SELECT id, movie_name, release_date, remaining_days, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image FROM schedules ORDER BY release_date ASC');
+      const naRes = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, robots FROM north_america ORDER BY id ASC');
+      const bo5Res = await pool.query('SELECT rank, movie_name, gross, verdict, trend, slug, seo_title, meta_description, meta_keywords, canonical_url FROM box_office_top5 ORDER BY rank ASC');
+      const galleriesRes = await pool.query('SELECT id, title, cover_image, images, date, slug, seo_title, meta_description, alt_text, canonical_url, og_image FROM galleries ORDER BY id ASC');
+      const articlesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots FROM articles ORDER BY date DESC');
+      const reviewsRes = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status, views, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, robots FROM reviews ORDER BY date DESC');
+      const boRes = await pool.query('SELECT id, slug, movie_name, director, movie_cast, poster, day_collection, worldwide_gross, india_net, india_gross, overseas, verdict, trend, days, languages, percentage, date, daily_breakdown, budget, total_india_net, us_premieres, views FROM box_office ORDER BY date DESC');
       const taxonomyRes = await pool.query('SELECT id, type, name, slug, description FROM taxonomy ORDER BY id ASC');
       const landingPageRes = await pool.query('SELECT id, active, banner_url, heading, description, cta_text, cta_url FROM landing_page ORDER BY id DESC LIMIT 1');
       const monetizationAdsRes = await pool.query('SELECT id, placement, active, script_code, image_url, link_url FROM monetization_ads ORDER BY id ASC');
@@ -60,6 +60,7 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           id: r.id,
           movieName: r.movie_name,
           releaseDate: r.release_date,
+          remainingDays: r.remaining_days,
           language: r.language,
           status: r.status,
           banner: r.banner,
@@ -69,7 +70,14 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           releaseStatus: r.release_status,
           trailerLink: r.trailer_link,
           notes: r.notes,
-          slug: r.slug
+          slug: r.slug,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url,
+          ogTitle: r.og_title,
+          ogDescription: r.og_description,
+          ogImage: r.og_image
         })),
         northAmericaCollections: naRes.rows.map(r => ({
           id: r.id,
@@ -93,21 +101,41 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           weekendCollections: r.weekend_collections,
           weeklyCollections: r.weekly_collections,
           dailyBreakdown: r.daily_breakdown,
-          notes: r.notes
+          notes: r.notes,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url,
+          ogTitle: r.og_title,
+          ogDescription: r.og_description,
+          ogImage: r.og_image,
+          twitterCard: r.twitter_card,
+          robots: r.robots
         })),
         boxOfficeTop5: bo5Res.rows.map(r => ({
           rank: r.rank,
           movieName: r.movie_name,
           gross: r.gross,
           verdict: r.verdict,
-          trend: r.trend
+          trend: r.trend,
+          slug: r.slug,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url
         })),
         galleries: galleriesRes.rows.map(r => ({
           id: r.id,
           title: r.title,
           coverImage: r.cover_image,
           images: typeof r.images === 'string' ? JSON.parse(r.images) : r.images,
-          date: r.date
+          date: r.date,
+          slug: r.slug,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          altText: r.alt_text,
+          canonicalUrl: r.canonical_url,
+          ogImage: r.og_image
         })),
         articles: articlesRes.rows.map(r => ({
           id: r.id,
@@ -120,7 +148,20 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           date: r.date,
           category: r.category,
           author: r.author,
-          tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags
+          tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags,
+          views: r.views || 0,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          focusKeyword: r.focus_keyword,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url,
+          ogTitle: r.og_title,
+          ogDescription: r.og_description,
+          ogImage: r.og_image,
+          twitterCard: r.twitter_card,
+          schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup,
+          breadcrumb: r.breadcrumb,
+          robots: r.robots
         })),
         reviews: reviewsRes.rows.map(r => ({
           id: r.id,
@@ -145,7 +186,18 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           releaseDate: r.release_date,
           runtime: r.runtime,
           trailer: r.trailer,
-          status: r.status
+          status: r.status,
+          views: r.views || 0,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url,
+          ogTitle: r.og_title,
+          ogDescription: r.og_description,
+          ogImage: r.og_image,
+          twitterCard: r.twitter_card,
+          schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup,
+          robots: r.robots
         })),
         boxOffice: boRes.rows.map(r => ({
           id: r.id,
@@ -168,7 +220,8 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           dailyBreakdown: typeof r.daily_breakdown === 'string' ? JSON.parse(r.daily_breakdown) : r.daily_breakdown,
           budget: r.budget,
           totalIndiaNet: r.total_india_net,
-          usPremieres: r.us_premieres
+          usPremieres: r.us_premieres,
+          views: r.views || 0
         })),
         taxonomy: taxonomyRes.rows,
         landingPage: landingPageRes.rows[0] ? {

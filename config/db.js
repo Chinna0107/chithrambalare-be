@@ -376,6 +376,7 @@ const initDb = async () => {
       "ALTER TABLE articles ADD COLUMN IF NOT EXISTS revision_history JSONB DEFAULT '[]'",
       "ALTER TABLE articles ADD COLUMN IF NOT EXISTS auto_saved_at TIMESTAMP",
       "ALTER TABLE articles ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false",
+      "ALTER TABLE articles ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0",
       // reviews
       "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS genre TEXT",
       "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS language TEXT",
@@ -402,6 +403,7 @@ const initDb = async () => {
       "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS twitter_card TEXT",
       "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS schema_markup JSONB",
       "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS robots TEXT DEFAULT 'index,follow'",
+      "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0",
       // north_america
       "ALTER TABLE north_america ADD COLUMN IF NOT EXISTS release_date TEXT",
       "ALTER TABLE north_america ADD COLUMN IF NOT EXISTS language TEXT",
@@ -427,6 +429,7 @@ const initDb = async () => {
       "ALTER TABLE north_america ADD COLUMN IF NOT EXISTS robots TEXT DEFAULT 'index,follow'",
       // schedules
       "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS banner TEXT",
+      "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS remaining_days TEXT",
       "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS director TEXT",
       "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS cast_list TEXT",
       "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS genre TEXT",
@@ -485,6 +488,7 @@ const initDb = async () => {
       "ALTER TABLE box_office ADD COLUMN IF NOT EXISTS og_image TEXT",
       "ALTER TABLE box_office ADD COLUMN IF NOT EXISTS twitter_card TEXT",
       "ALTER TABLE box_office ADD COLUMN IF NOT EXISTS robots TEXT DEFAULT 'index,follow'",
+      "ALTER TABLE box_office ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0",
       // landing_page
       "ALTER TABLE landing_page ADD COLUMN IF NOT EXISTS background_image TEXT",
       "ALTER TABLE landing_page ADD COLUMN IF NOT EXISTS video_background TEXT",

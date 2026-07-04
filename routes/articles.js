@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
   if (pool) {
     try {
       let countQuery = 'SELECT COUNT(*) FROM articles';
-      let query = 'SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags FROM articles';
+      let query = 'SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots FROM articles';
       const params = [];
       const conditions = [];
       
@@ -47,7 +47,8 @@ router.get('/', async (req, res) => {
         id: r.id, slug: r.slug, title: r.title, excerpt: r.excerpt,
         content: r.content,
         thumbnail: r.thumbnail, featuredImage: r.featured_image, date: r.date,
-        category: r.category, author: r.author, tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags
+        category: r.category, author: r.author, tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags, views: r.views || 0,
+        seoTitle: r.seo_title, metaDescription: r.meta_description, focusKeyword: r.focus_keyword, metaKeywords: r.meta_keywords, canonicalUrl: r.canonical_url, ogTitle: r.og_title, ogDescription: r.og_description, ogImage: r.og_image, twitterCard: r.twitter_card, schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup, breadcrumb: r.breadcrumb, robots: r.robots
       }));
       
       return res.json({ 
@@ -89,14 +90,15 @@ router.get('/:slug', async (req, res) => {
 
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags FROM articles WHERE slug = $1', [slug]);
+      const result = await pool.query('UPDATE articles SET views = COALESCE(views, 0) + 1 WHERE slug = $1 RETURNING id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots', [slug]);
       if (result.rows.length > 0) {
         const r = result.rows[0];
         return res.json({
           id: r.id, slug: r.slug, title: r.title, excerpt: r.excerpt,
           content: r.content,
           thumbnail: r.thumbnail, featuredImage: r.featured_image, date: r.date,
-          category: r.category, author: r.author, tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags
+          category: r.category, author: r.author, tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags, views: r.views || 0,
+          seoTitle: r.seo_title, metaDescription: r.meta_description, focusKeyword: r.focus_keyword, metaKeywords: r.meta_keywords, canonicalUrl: r.canonical_url, ogTitle: r.og_title, ogDescription: r.og_description, ogImage: r.og_image, twitterCard: r.twitter_card, schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup, breadcrumb: r.breadcrumb, robots: r.robots
         });
       }
     } catch (e) {
@@ -104,9 +106,11 @@ router.get('/:slug', async (req, res) => {
     }
   }
   const db = readDb();
-  const article = (db.articles || []).find(a => a.slug === slug);
-  if (!article) return res.status(404).json({ error: 'Article not found' });
-  return res.json(article);
+  const index = (db.articles || []).findIndex(a => a.slug === slug);
+  if (index === -1) return res.status(404).json({ error: 'Article not found' });
+  db.articles[index].views = (db.articles[index].views || 0) + 1;
+  writeDb(db);
+  return res.json(db.articles[index]);
 });
 
 // Admin: Bulk replace (wrapped in transaction)
@@ -122,8 +126,8 @@ router.post('/bulk', requireAdminPasscode, async (req, res) => {
       await client.query('DELETE FROM articles');
       for (const a of list) {
         await client.query(
-          'INSERT INTO articles (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-          [ String(a.id), a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []) ]
+          'INSERT INTO articles (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)',
+          [ String(a.id), a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), a.seoTitle, a.metaDescription, a.focusKeyword, a.metaKeywords, a.canonicalUrl, a.ogTitle, a.ogDescription, a.ogImage, a.twitterCard, JSON.stringify(a.schemaMarkup || {}), a.breadcrumb, a.robots || 'index,follow' ]
         );
       }
       await client.query('COMMIT');
@@ -153,8 +157,8 @@ router.post('/', requireAdminPasscode, async (req, res) => {
   const newId = a.id ? String(a.id) : Date.now().toString();
   if (pool) {
     try {
-      await pool.query('INSERT INTO articles (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [ newId, a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []) ]);
+      await pool.query('INSERT INTO articles (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)',
+        [ newId, a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), a.seoTitle, a.metaDescription, a.focusKeyword, a.metaKeywords, a.canonicalUrl, a.ogTitle, a.ogDescription, a.ogImage, a.twitterCard, JSON.stringify(a.schemaMarkup || {}), a.breadcrumb, a.robots || 'index,follow' ]);
       return res.json({ success: true, id: newId });
     } catch (e) {
       console.error('PG Article insert failed:', e.message);
@@ -174,8 +178,8 @@ router.put('/:id', requireAdminPasscode, async (req, res) => {
   const id = req.params.id; const a = req.body;
   if (pool) {
     try {
-      const result = await pool.query('UPDATE articles SET slug=$1, title=$2, excerpt=$3, content=$4, thumbnail=$5, featured_image=$6, date=$7, category=$8, author=$9, tags=$10 WHERE id=$11',
-        [ a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), id ]);
+      const result = await pool.query('UPDATE articles SET slug=$1, title=$2, excerpt=$3, content=$4, thumbnail=$5, featured_image=$6, date=$7, category=$8, author=$9, tags=$10, seo_title=$11, meta_description=$12, focus_keyword=$13, meta_keywords=$14, canonical_url=$15, og_title=$16, og_description=$17, og_image=$18, twitter_card=$19, schema_markup=$20, breadcrumb=$21, robots=$22 WHERE id=$23',
+        [ a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), a.seoTitle, a.metaDescription, a.focusKeyword, a.metaKeywords, a.canonicalUrl, a.ogTitle, a.ogDescription, a.ogImage, a.twitterCard, JSON.stringify(a.schemaMarkup || {}), a.breadcrumb, a.robots || 'index,follow', id ]);
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Article not found' });
       }

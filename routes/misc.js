@@ -118,11 +118,12 @@ router.get('/imdb-image', async (req, res) => {
 router.get('/schedules', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
+      const result = await pool.query('SELECT id, movie_name, release_date, remaining_days, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
       const schedules = result.rows.map(r => ({
         id: r.id,
         movieName: r.movie_name,
         releaseDate: r.release_date,
+        remainingDays: r.remaining_days,
         language: r.language,
         status: r.status,
         banner: r.banner,
@@ -147,11 +148,11 @@ router.get('/schedules/:slug', async (req, res) => {
   const { slug } = req.params;
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules WHERE slug = $1 OR id::text = $1', [slug]);
+      const result = await pool.query('SELECT id, movie_name, release_date, remaining_days, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules WHERE slug = $1 OR id::text = $1', [slug]);
       if (result.rows.length > 0) {
         const r = result.rows[0];
         return res.json({
-          id: r.id, movieName: r.movie_name, releaseDate: r.release_date, language: r.language, status: r.status,
+          id: r.id, movieName: r.movie_name, releaseDate: r.release_date, remainingDays: r.remaining_days, language: r.language, status: r.status,
           banner: r.banner, director: r.director, castList: r.cast_list, genre: r.genre, releaseStatus: r.release_status,
           trailerLink: r.trailer_link, notes: r.notes, slug: r.slug
         });
@@ -172,17 +173,18 @@ router.post('/schedules', requireAdminPasscode, async (req, res) => {
       await pool.query('DELETE FROM schedules');
       for (const s of list) {
         await pool.query(
-          'INSERT INTO schedules (movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
-          [s.movieName, s.releaseDate, s.language, s.status, s.banner, s.director, s.castList, s.genre, s.releaseStatus, s.trailerLink, s.notes, s.slug]
+          'INSERT INTO schedules (movie_name, release_date, remaining_days, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)',
+          [s.movieName, s.releaseDate, s.remainingDays, s.language, s.status, s.banner, s.director, s.castList, s.genre, s.releaseStatus, s.trailerLink, s.notes, s.slug, s.seoTitle, s.metaDescription, s.metaKeywords, s.canonicalUrl, s.ogTitle, s.ogDescription, s.ogImage]
         );
       }
-      const result = await pool.query('SELECT id, movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
+      const result = await pool.query('SELECT id, movie_name, release_date, remaining_days, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug FROM schedules ORDER BY release_date ASC');
       return res.json({
         success: true,
         upcomingSchedules: result.rows.map(r => ({
           id: r.id,
           movieName: r.movie_name,
           releaseDate: r.release_date,
+          remainingDays: r.remaining_days,
           language: r.language,
           status: r.status,
           banner: r.banner,
@@ -191,8 +193,14 @@ router.post('/schedules', requireAdminPasscode, async (req, res) => {
           genre: r.genre,
           releaseStatus: r.release_status,
           trailerLink: r.trailer_link,
-          notes: r.notes,
-          slug: r.slug
+          slug: r.slug,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url,
+          ogTitle: r.og_title,
+          ogDescription: r.og_description,
+          ogImage: r.og_image
         }))
       });
     } catch (e) {
@@ -278,8 +286,8 @@ router.post('/north-america', requireAdminPasscode, async (req, res) => {
       await pool.query('DELETE FROM north_america');
       for (const n of list) {
         await pool.query(
-          'INSERT INTO north_america (slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)',
-          [n.slug, n.movieName, n.hourlyGross, n.totalGross, n.premierGross, n.screens, n.status, n.lastUpdated, n.poster, n.releaseDate, n.language, n.distributor, n.genre, n.budget, n.openingDayPreview, n.advanceBookings, n.premiereCollections, n.weekendCollections, n.weeklyCollections, JSON.stringify(n.dailyBreakdown || []), n.notes]
+          'INSERT INTO north_america (slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, robots) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)',
+          [n.slug, n.movieName, n.hourlyGross, n.totalGross, n.premierGross, n.screens, n.status, n.lastUpdated, n.poster, n.releaseDate, n.language, n.distributor, n.genre, n.budget, n.openingDayPreview, n.advanceBookings, n.premiereCollections, n.weekendCollections, n.weeklyCollections, JSON.stringify(n.dailyBreakdown || []), n.notes, n.seoTitle, n.metaDescription, n.metaKeywords, n.canonicalUrl, n.ogTitle, n.ogDescription, n.ogImage, n.twitterCard, n.robots || 'index,follow']
         );
       }
       const result = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes FROM north_america ORDER BY id ASC');
@@ -307,7 +315,16 @@ router.post('/north-america', requireAdminPasscode, async (req, res) => {
           weekendCollections: r.weekend_collections,
           weeklyCollections: r.weekly_collections,
           dailyBreakdown: r.daily_breakdown,
-          notes: r.notes
+          notes: r.notes,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url,
+          ogTitle: r.og_title,
+          ogDescription: r.og_description,
+          ogImage: r.og_image,
+          twitterCard: r.twitter_card,
+          robots: r.robots
         }))
       });
     } catch (e) {
@@ -357,8 +374,8 @@ router.post('/box-office-top5', requireAdminPasscode, async (req, res) => {
       await pool.query('DELETE FROM box_office_top5');
       for (const b of list) {
         await pool.query(
-          'INSERT INTO box_office_top5 (rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-          [b.rank, b.movieName, b.gross, b.verdict, b.trend, b.openingCollection, b.weekendCollection, b.totalCollection, b.territory, b.lastUpdated]
+          'INSERT INTO box_office_top5 (rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated, slug, seo_title, meta_description, meta_keywords, canonical_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
+          [b.rank, b.movieName, b.gross, b.verdict, b.trend, b.openingCollection, b.weekendCollection, b.totalCollection, b.territory, b.lastUpdated, b.slug, b.seoTitle, b.metaDescription, b.metaKeywords, b.canonicalUrl]
         );
       }
       const result = await pool.query('SELECT rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated FROM box_office_top5 ORDER BY rank ASC');
@@ -374,7 +391,12 @@ router.post('/box-office-top5', requireAdminPasscode, async (req, res) => {
           weekendCollection: r.weekend_collection,
           totalCollection: r.total_collection,
           territory: r.territory,
-          lastUpdated: r.last_updated
+          lastUpdated: r.last_updated,
+          slug: r.slug,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url
         }))
       });
     } catch (e) {
@@ -419,8 +441,8 @@ router.post('/galleries', requireAdminPasscode, async (req, res) => {
       await pool.query('DELETE FROM galleries');
       for (const g of list) {
         await pool.query(
-          'INSERT INTO galleries (title, cover_image, images, date) VALUES ($1, $2, $3, $4)',
-          [g.title, g.coverImage, JSON.stringify(g.images || []), g.date || new Date().toISOString()]
+          'INSERT INTO galleries (title, cover_image, images, date, slug, seo_title, meta_description, alt_text, canonical_url, og_image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+          [g.title, g.coverImage, JSON.stringify(g.images || []), g.date || new Date().toISOString(), g.slug, g.seoTitle, g.metaDescription, g.altText, g.canonicalUrl, g.ogImage]
         );
       }
       const result = await pool.query('SELECT id, title, cover_image, images, date FROM galleries ORDER BY id ASC');
@@ -431,7 +453,13 @@ router.post('/galleries', requireAdminPasscode, async (req, res) => {
           title: r.title,
           coverImage: r.cover_image,
           images: typeof r.images === 'string' ? JSON.parse(r.images) : r.images,
-          date: r.date
+          date: r.date,
+          slug: r.slug,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          altText: r.alt_text,
+          canonicalUrl: r.canonical_url,
+          ogImage: r.og_image
         }))
       });
     } catch (e) {
@@ -451,13 +479,13 @@ router.post('/galleries', requireAdminPasscode, async (req, res) => {
 
 // Individual schedule CRUD
 router.post('/schedules/single', requireAdminPasscode, async (req, res) => {
-  const { movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
+  const { movieName, releaseDate, remainingDays, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
   if (pool) {
     try {
       const result = await pool.query(
-        `INSERT INTO schedules (movie_name, release_date, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, seo_title, meta_description, meta_keywords, slug, canonical_url, og_title, og_description, og_image)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
-        [movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus || 'upcoming', trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage]
+        `INSERT INTO schedules (movie_name, release_date, remaining_days, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, seo_title, meta_description, meta_keywords, slug, canonical_url, og_title, og_description, og_image)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+        [movieName, releaseDate, remainingDays, language, status, banner, director, castList, genre, releaseStatus || 'upcoming', trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage]
       );
       return res.json({ success: true, item: result.rows[0] });
     } catch (e) { console.error('PG schedule add failed:', e.message); return res.status(500).json({ error: 'Failed to add schedule' }); }
@@ -472,12 +500,12 @@ router.post('/schedules/single', requireAdminPasscode, async (req, res) => {
 
 router.put('/schedules/:id', requireAdminPasscode, async (req, res) => {
   const { id } = req.params;
-  const { movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
+  const { movieName, releaseDate, remainingDays, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
   if (pool) {
     try {
       const result = await pool.query(
-        `UPDATE schedules SET movie_name=$1, release_date=$2, language=$3, status=$4, banner=$5, director=$6, cast_list=$7, genre=$8, release_status=$9, trailer_link=$10, notes=$11, seo_title=$12, meta_description=$13, meta_keywords=$14, slug=$15, canonical_url=$16, og_title=$17, og_description=$18, og_image=$19 WHERE id=$20 RETURNING *`,
-        [movieName, releaseDate, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage, id]
+        `UPDATE schedules SET movie_name=$1, release_date=$2, remaining_days=$3, language=$4, status=$5, banner=$6, director=$7, cast_list=$8, genre=$9, release_status=$10, trailer_link=$11, notes=$12, seo_title=$13, meta_description=$14, meta_keywords=$15, slug=$16, canonical_url=$17, og_title=$18, og_description=$19, og_image=$20 WHERE id=$21 RETURNING *`,
+        [movieName, releaseDate, remainingDays, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage, id]
       );
       if (result.rowCount === 0) return res.status(404).json({ error: 'Schedule not found' });
       return res.json({ success: true });
