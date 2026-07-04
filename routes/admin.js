@@ -323,12 +323,13 @@ router.post('/db/reset', requireAdminPasscode, async (req, res) => {
 router.get('/popup-ad', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT active, title, image_desktop, image_mobile, image_url, button_text, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay FROM popup_ad ORDER BY id DESC LIMIT 1');
+      const result = await pool.query('SELECT active, title, description, image_desktop, image_mobile, image_url, button_text, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay, carousel_items FROM popup_ad ORDER BY id DESC LIMIT 1');
       if (result.rows.length > 0) {
         const ad = result.rows[0];
         return res.json({
           active: ad.active,
           title: ad.title,
+          description: ad.description,
           imageDesktop: ad.image_desktop,
           imageMobile: ad.image_mobile,
           imageUrl: ad.image_url,
@@ -339,7 +340,8 @@ router.get('/popup-ad', async (req, res) => {
           closeTimer: ad.close_timer,
           autoClose: ad.auto_close,
           displayRule: ad.display_rule,
-          displayDelay: ad.display_delay
+          displayDelay: ad.display_delay,
+          carouselItems: ad.carousel_items || []
         });
       }
     } catch (e) {
@@ -356,8 +358,8 @@ router.post('/popup-ad', requireAdminPasscode, async (req, res) => {
     try {
       await pool.query('DELETE FROM popup_ad');
       await pool.query(
-        'INSERT INTO popup_ad (active, title, image_desktop, image_mobile, image_url, button_text, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
-        [ad.active, ad.title, ad.imageDesktop, ad.imageMobile, ad.imageUrl, ad.buttonText, ad.redirectUrl, ad.scheduleStart || null, ad.scheduleEnd || null, ad.closeTimer || 0, ad.autoClose || false, ad.displayRule || 'every_visit', ad.displayDelay || 0]
+        'INSERT INTO popup_ad (active, title, description, image_desktop, image_mobile, image_url, button_text, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay, carousel_items) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
+        [ad.active, ad.title, ad.description, ad.imageDesktop, ad.imageMobile, ad.imageUrl, ad.buttonText, ad.redirectUrl, ad.scheduleStart || null, ad.scheduleEnd || null, ad.closeTimer || 0, ad.autoClose || false, ad.displayRule || 'every_visit', ad.displayDelay || 0, JSON.stringify(ad.carouselItems || [])]
       );
       return res.json({ success: true, popupAd: ad });
     } catch (e) {

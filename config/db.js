@@ -113,7 +113,8 @@ const readDb = () => {
           closeTimer: 0,
           autoClose: false,
           displayRule: "every_visit",
-          displayDelay: 0
+          displayDelay: 0,
+          carouselItems: []
         },
         boxOfficeTop5: [
           { rank: 1, movieName: "Peddi", gross: "₹320 Cr", verdict: "Blockbuster", trend: "▲ Strong" },
@@ -166,7 +167,8 @@ const initDb = async () => {
         close_timer INT,
         auto_close BOOLEAN,
         display_rule TEXT,
-        display_delay INT
+        display_delay INT,
+        carousel_items JSONB
       );
       CREATE TABLE IF NOT EXISTS schedules (
         id SERIAL PRIMARY KEY,
@@ -508,7 +510,9 @@ const initDb = async () => {
       "ALTER TABLE popup_ad ADD COLUMN IF NOT EXISTS close_timer INT",
       "ALTER TABLE popup_ad ADD COLUMN IF NOT EXISTS auto_close BOOLEAN",
       "ALTER TABLE popup_ad ADD COLUMN IF NOT EXISTS display_rule TEXT",
-      "ALTER TABLE popup_ad ADD COLUMN IF NOT EXISTS display_delay INT"
+      "ALTER TABLE popup_ad ADD COLUMN IF NOT EXISTS display_delay INT",
+      "ALTER TABLE popup_ad ADD COLUMN IF NOT EXISTS carousel_items JSONB DEFAULT '[]'",
+      "ALTER TABLE popup_ad ADD COLUMN IF NOT EXISTS description TEXT"
     ];
     for (const q of alterQueries) {
       await pool.query(q);
@@ -550,8 +554,8 @@ const initDb = async () => {
     if (parseInt(popupCheck.rows[0].count) === 0 && defaultData.popupAd) {
       const p = defaultData.popupAd;
       await pool.query(
-        'INSERT INTO popup_ad (active, title, image_desktop, image_mobile, redirect_url, close_timer, auto_close, display_rule, display_delay) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-        [p.active, p.title, p.imageDesktop, p.imageMobile, p.redirectUrl, p.closeTimer, p.autoClose, p.displayRule, p.displayDelay]
+        'INSERT INTO popup_ad (active, title, image_desktop, image_mobile, redirect_url, close_timer, auto_close, display_rule, display_delay, carousel_items) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+        [p.active, p.title, p.imageDesktop, p.imageMobile, p.redirectUrl, p.closeTimer, p.autoClose, p.displayRule, p.displayDelay, JSON.stringify(p.carouselItems || [])]
       );
     }
 
