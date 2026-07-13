@@ -15,6 +15,52 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date() });
 });
 
+router.get('/stats', async (req, res) => {
+  const { type } = req.query;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStr = todayStart.toISOString();
+
+  try {
+    if (pool) {
+      if (type === 'movie-news' || type === 'ott') {
+        let countQuery = 'SELECT COUNT(*) FROM articles';
+        let todayQuery = 'SELECT COUNT(*) FROM articles WHERE date >= $1';
+        let params = [todayStr];
+        
+        if (type === 'ott') {
+          countQuery += " WHERE category ILIKE '%ott%' OR tags::text ILIKE '%ott%'";
+          todayQuery += " AND (category ILIKE '%ott%' OR tags::text ILIKE '%ott%')";
+        }
+        
+        const [totalRes, todayRes] = await Promise.all([
+          pool.query(countQuery),
+          pool.query(todayQuery, params)
+        ]);
+        return res.json({ total: parseInt(totalRes.rows[0].count), today: parseInt(todayRes.rows[0].count) });
+      } else if (type === 'reviews') {
+        const [totalRes, todayRes] = await Promise.all([
+          pool.query('SELECT COUNT(*) FROM reviews'),
+          pool.query('SELECT COUNT(*) FROM reviews WHERE date >= $1', [todayStr])
+        ]);
+        return res.json({ total: parseInt(totalRes.rows[0].count), today: parseInt(todayRes.rows[0].count) });
+      }
+    }
+
+    const db = readDb();
+    let items = [];
+    if (type === 'movie-news') items = db.articles || [];
+    else if (type === 'ott') items = (db.articles || []).filter(a => a.category?.toLowerCase().includes('ott') || (a.tags || []).some(t => t.toLowerCase().includes('ott')));
+    else if (type === 'reviews') items = db.reviews || [];
+
+    const todayCount = items.filter(i => i.date && new Date(i.date) >= todayStart).length;
+    return res.json({ total: items.length, today: todayCount });
+  } catch (e) {
+    console.error('Stats fetch failed:', e.message);
+    return res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
 router.post('/track-visit', async (req, res) => {
   const { visitorId, path: pagePath } = req.body;
   if (!visitorId) return res.status(400).json({ error: 'visitorId required' });
@@ -633,4 +679,75 @@ router.delete('/galleries/:id', requireAdminPasscode, async (req, res) => {
   res.json({ success: true });
 });
 
+// Public comments endpoints
+router.get('/comments/:entityType/:entityId', async (req, res) => {
+  const { entityType, entityId } = req.params;
+  if (pool) {
+    try {
+      const result = await pool.query(
+        'SELECT id, user_name, comment_text, date FROM comments WHERE entity_type=$1 AND entity_id=$2 AND status=$3 ORDER BY date DESC',
+        [entityType, entityId, 'approved']
+      );
+      return res.json(result.rows.map(r => ({
+        id: r.id,
+        name: r.user_name,
+        text: r.comment_text,
+        date: r.date
+      })));
+    } catch (e) {
+      console.error('PG comments fetch failed:', e.message);
+      return res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+  }
+  const db = readDb();
+  const comments = (db.comments || [])
+    .filter(c => c.entity_type === entityType && String(c.entity_id) === String(entityId) && c.status === 'approved')
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .map(c => ({
+      id: c.id,
+      name: c.user_name,
+      text: c.comment_text,
+      date: c.date
+    }));
+  res.json(comments);
+});
+
+router.post('/comments', async (req, res) => {
+  const { entityType, entityId, name, text } = req.body;
+  if (!entityType || !entityId || !name || !text) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  const dateStr = new Date().toISOString();
+  
+  if (pool) {
+    try {
+      const result = await pool.query(
+        'INSERT INTO comments (entity_type, entity_id, user_name, comment_text, status, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_name, comment_text, date',
+        [entityType, entityId, name, text, 'approved', dateStr]
+      );
+      const r = result.rows[0];
+      return res.json({ success: true, comment: { id: r.id, name: r.user_name, text: r.comment_text, date: r.date } });
+    } catch (e) {
+      console.error('PG comment insert failed:', e.message);
+      return res.status(500).json({ error: 'Failed to submit comment' });
+    }
+  }
+  
+  const db = readDb();
+  if (!db.comments) db.comments = [];
+  const newComment = {
+    id: Date.now(),
+    entity_type: entityType,
+    entity_id: entityId,
+    user_name: name,
+    comment_text: text,
+    status: 'approved',
+    date: dateStr
+  };
+  db.comments.push(newComment);
+  writeDb(db);
+  res.json({ success: true, comment: { id: newComment.id, name: newComment.user_name, text: newComment.comment_text, date: newComment.date } });
+});
+
 module.exports = router;
+
