@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { pool, readDb } = require('../config/db');
 
+// A real hosted fallback image (served from Cloudinary so it's always accessible)
+const FALLBACK_IMAGE = 'https://res.cloudinary.com/dmsx7md7p/image/upload/v1783962254/tolly-images/pqwr03cpfgci6vwsin3q.jpg';
+
+// Helper: return first non-empty string value from a list of candidates
+const firstVal = (...args) => args.find(v => v && String(v).trim() !== '') || FALLBACK_IMAGE;
+
 // Helper to fetch from DB
 const getItem = async (table, slug) => {
   if (pool) {
@@ -14,40 +20,54 @@ const getItem = async (table, slug) => {
   }
 };
 
-const generateHtml = (title, description, image, redirectUrl) => `
-<!DOCTYPE html>
+const generateHtml = (title, description, image, redirectUrl) => {
+  const safeTitle = String(title || '').replace(/"/g, '&quot;');
+  const safeDesc = String(description || '').replace(/"/g, '&quot;');
+  const safeImg = String(image || FALLBACK_IMAGE).replace(/"/g, '&quot;');
+  const safeUrl = String(redirectUrl || '').replace(/"/g, '&quot;');
+
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${title}</title>
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${description}">
-  <meta property="og:image" content="${image}">
-  <meta property="og:url" content="${redirectUrl}">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>${safeTitle}</title>
+  <meta property="og:site_name" content="ChitramBhalare">
   <meta property="og:type" content="article">
+  <meta property="og:title" content="${safeTitle}">
+  <meta property="og:description" content="${safeDesc}">
+  <meta property="og:image" content="${safeImg}">
+  <meta property="og:image:secure_url" content="${safeImg}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:url" content="${safeUrl}">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${title}">
-  <meta name="twitter:description" content="${description}">
-  <meta name="twitter:image" content="${image}">
-  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-  <script>window.location.href = "${redirectUrl}";</script>
+  <meta name="twitter:title" content="${safeTitle}">
+  <meta name="twitter:description" content="${safeDesc}">
+  <meta name="twitter:image" content="${safeImg}">
+  <meta name="description" content="${safeDesc}">
+  <link rel="canonical" href="${safeUrl}">
+  <meta http-equiv="refresh" content="0;url=${safeUrl}">
+  <script>window.location.replace("${safeUrl}");</script>
 </head>
 <body>
-  <p>Redirecting to <a href="${redirectUrl}">article</a>...</p>
+  <p>Redirecting… <a href="${safeUrl}">Click here if not redirected</a></p>
 </body>
-</html>
-`;
+</html>`;
+};
 
 router.get('/article/:slug', async (req, res) => {
   try {
     const article = await getItem('articles', req.params.slug);
     if (!article) return res.status(404).send('Not found');
-    
-    const title = article.seo_title || article.seoTitle || article.title || 'Article';
-    const desc = article.meta_description || article.metaDescription || article.excerpt || '';
-    const img = article.og_image || article.ogImage || article.featured_image || article.featuredImage || article.thumbnail || 'https://chitrambhalare.in/logo.png';
+
+    const title = firstVal(article.seo_title, article.title, 'ChitramBhalare Article');
+    const desc = firstVal(article.meta_description, article.excerpt, 'Read the latest Tollywood news on ChitramBhalare');
+    const img = firstVal(article.og_image, article.thumbnail, article.featured_image);
     const redirectUrl = `https://chitrambhalare.in/movie-news/${article.slug}`;
 
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(generateHtml(title, desc, img, redirectUrl));
   } catch (err) {
     console.error(err);
@@ -59,12 +79,13 @@ router.get('/review/:slug', async (req, res) => {
   try {
     const review = await getItem('reviews', req.params.slug);
     if (!review) return res.status(404).send('Not found');
-    
-    const title = review.seo_title || review.seoTitle || `${review.movie_name || review.movieName} Review`;
-    const desc = review.meta_description || review.metaDescription || review.snippet || review.verdict || '';
-    const img = review.og_image || review.ogImage || review.poster || 'https://chitrambhalare.in/logo.png';
+
+    const title = firstVal(review.seo_title, review.movie_name && `${review.movie_name} Review`, review.title, 'Movie Review');
+    const desc = firstVal(review.meta_description, review.verdict, review.snippet, 'Read the full review on ChitramBhalare');
+    const img = firstVal(review.og_image, review.poster, review.thumbnail);
     const redirectUrl = `https://chitrambhalare.in/reviews/${review.slug}`;
 
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(generateHtml(title, desc, img, redirectUrl));
   } catch (err) {
     console.error(err);
@@ -76,12 +97,13 @@ router.get('/telugu-news/:slug', async (req, res) => {
   try {
     const item = await getItem('telugu_news', req.params.slug);
     if (!item) return res.status(404).send('Not found');
-    
-    const title = item.seo_title || item.title || 'Telugu News';
-    const desc = item.meta_description || item.excerpt || '';
-    const img = item.og_image || item.thumbnail || 'https://chitrambhalare.in/logo.png';
+
+    const title = firstVal(item.seo_title, item.title, 'Telugu News');
+    const desc = firstVal(item.meta_description, item.excerpt, 'Read Telugu News on ChitramBhalare');
+    const img = firstVal(item.og_image, item.thumbnail);
     const redirectUrl = `https://chitrambhalare.in/telugu-news/${item.slug}`;
 
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(generateHtml(title, desc, img, redirectUrl));
   } catch (err) {
     console.error(err);
