@@ -45,8 +45,8 @@ router.get('/article/:slug', async (req, res) => {
     
     const title = article.seo_title || article.seoTitle || article.title || 'Article';
     const desc = article.meta_description || article.metaDescription || article.excerpt || '';
-    const img = article.og_image || article.ogImage || article.featured_image || article.featuredImage || article.thumbnail || 'https://chitrambhalare.com/logo.png';
-    const redirectUrl = `https://chithrambalahare.vercel.app/movie-news/${article.slug}`;
+    const img = article.og_image || article.ogImage || article.featured_image || article.featuredImage || article.thumbnail || 'https://chitrambhalare.in/logo.png';
+    const redirectUrl = `https://chitrambhalare.in/movie-news/${article.slug}`;
 
     res.send(generateHtml(title, desc, img, redirectUrl));
   } catch (err) {
@@ -62,8 +62,25 @@ router.get('/review/:slug', async (req, res) => {
     
     const title = review.seo_title || review.seoTitle || `${review.movie_name || review.movieName} Review`;
     const desc = review.meta_description || review.metaDescription || review.snippet || review.verdict || '';
-    const img = review.og_image || review.ogImage || review.poster || 'https://chitrambhalare.com/logo.png';
-    const redirectUrl = `https://chithrambalahare.vercel.app/reviews/${review.slug}`;
+    const img = review.og_image || review.ogImage || review.poster || 'https://chitrambhalare.in/logo.png';
+    const redirectUrl = `https://chitrambhalare.in/reviews/${review.slug}`;
+
+    res.send(generateHtml(title, desc, img, redirectUrl));
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server Error');
+  }
+});
+
+router.get('/telugu-news/:slug', async (req, res) => {
+  try {
+    const item = await getItem('telugu_news', req.params.slug);
+    if (!item) return res.status(404).send('Not found');
+    
+    const title = item.seo_title || item.title || 'Telugu News';
+    const desc = item.meta_description || item.excerpt || '';
+    const img = item.og_image || item.thumbnail || 'https://chitrambhalare.in/logo.png';
+    const redirectUrl = `https://chitrambhalare.in/telugu-news/${item.slug}`;
 
     res.send(generateHtml(title, desc, img, redirectUrl));
   } catch (err) {

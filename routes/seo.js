@@ -78,7 +78,7 @@ router.get('/health', async (req, res) => {
 
 // Dynamic Sitemap
 router.get('/sitemap.xml', async (req, res) => {
-  const baseUrl = 'https://chitrambhalare.com';
+  const baseUrl = 'https://chitrambhalare.in';
   let urls = [
     { loc: baseUrl, priority: '1.0', changefreq: 'daily' },
     { loc: `${baseUrl}/movie-news`, priority: '0.9', changefreq: 'daily' },
