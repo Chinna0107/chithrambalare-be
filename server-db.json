@@ -3252,10 +3252,28 @@
   ],
   "popupAd": {
     "active": true,
-    "title": "ChitramBhalare Exclusive: Mega Blockbuster Peddi Success Meet Live Stream at 6:00 PM!",
-    "imageUrl": "https://res.cloudinary.com/dmsx7md7p/image/upload/v1783016041/tolly-images/linb3ddlg6hydiqrhsso.jpg",
-    "linkUrl": "https://moneyspotfintech.com/",
-    "buttonText": "View More"
+    "title": "Sankranthi Special",
+    "imageDesktop": "https://res.cloudinary.com/dmsx7md7p/image/upload/v1784018356/tolly-images/gjcrnvtgdvtftlxufseh.jpg",
+    "imageMobile": "https://res.cloudinary.com/dmsx7md7p/image/upload/v1784018360/tolly-images/oiddyatawx7o36weys7l.jpg",
+    "redirectUrl": "https://zewo.in",
+    "scheduleStart": {},
+    "scheduleEnd": {},
+    "closeTimer": 31,
+    "autoClose": true,
+    "displayRule": "every_visit",
+    "displayDelay": 0,
+    "imageUrl": "",
+    "buttonText": "",
+    "carouselItems": [
+      {
+        "imageUrl": "https://res.cloudinary.com/dmsx7md7p/image/upload/v1784018802/tolly-images/viygc1vl0j5q7ddoa6pe.jpg",
+        "redirectUrl": "CODTECH IT SOLUTIONS",
+        "timer": 3,
+        "title": "CODTECH IT SOLUTIONS",
+        "companyName": "CODTECH IT SOLUTIONS",
+        "description": "CODTECH IT SOLUTIONS"
+      }
+    ]
   },
   "boxOfficeTop5": [
     {

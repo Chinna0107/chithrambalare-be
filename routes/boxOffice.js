@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool, readDb, writeDb } = require('../config/db.js');
-const { requireAdminPasscode } = require('../middlewares/auth.js');
+const { requireEmployeeOrAdmin } = require('../middlewares/auth.js');
 
 // Helper to sort by date
 const sortBoxOffice = (items) => [...items].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -43,7 +43,7 @@ router.get('/:slug', async (req, res) => {
 });
 
 // Admin: Bulk replace (wrapped in transaction)
-router.post('/bulk', requireAdminPasscode, async (req, res) => {
+router.post('/bulk', requireEmployeeOrAdmin, async (req, res) => {
   const list = req.body;
   if (!Array.isArray(list)) {
     return res.status(400).json({ error: 'Request body must be an array' });
@@ -76,7 +76,7 @@ router.post('/bulk', requireAdminPasscode, async (req, res) => {
 });
 
 // Admin: Add Single (with validation)
-router.post('/', requireAdminPasscode, async (req, res) => {
+router.post('/', requireEmployeeOrAdmin, async (req, res) => {
   const b = req.body;
   if (!b.movieName || !b.slug) {
     return res.status(400).json({ error: 'Missing required fields: movieName, slug' });
@@ -101,7 +101,7 @@ router.post('/', requireAdminPasscode, async (req, res) => {
 });
 
 // Admin: Edit Single (with rowCount check)
-router.put('/:id', requireAdminPasscode, async (req, res) => {
+router.put('/:id', requireEmployeeOrAdmin, async (req, res) => {
   const id = req.params.id; const b = req.body;
   if (pool) {
     try {
@@ -127,7 +127,7 @@ router.put('/:id', requireAdminPasscode, async (req, res) => {
 });
 
 // Admin: Delete Single (with rowCount check)
-router.delete('/:id', requireAdminPasscode, async (req, res) => {
+router.delete('/:id', requireEmployeeOrAdmin, async (req, res) => {
   const id = req.params.id;
   if (pool) {
     try {

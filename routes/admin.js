@@ -3,7 +3,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { pool, readDb, writeDb, initDb } = require('../config/db.js');
-const { requireAdminPasscode } = require('../middlewares/auth.js');
+const { requireAdminPasscode, requireEmployeeOrAdmin } = require('../middlewares/auth.js');
 
 const DB_PATH = path.join(__dirname, '..', 'server-db.json');
 
@@ -11,10 +11,10 @@ router.get('/verify', requireAdminPasscode, (req, res) => {
   res.json({ ok: true });
 });
 
-router.get('/db', requireAdminPasscode, async (req, res) => {
+router.get('/db', requireEmployeeOrAdmin, async (req, res) => {
   if (pool) {
     try {
-      const popupRes = await pool.query('SELECT active, title, image_desktop, image_mobile, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay FROM popup_ad ORDER BY id DESC LIMIT 1');
+      const popupRes = await pool.query('SELECT active, title, image_desktop, image_mobile, redirect_url, schedule_start, schedule_end, close_timer, auto_close, display_rule, display_delay, carousel_items FROM popup_ad ORDER BY id DESC LIMIT 1');
       const schedulesRes = await pool.query('SELECT id, movie_name, release_date, remaining_days, language, status, banner, director, cast_list, genre, release_status, trailer_link, notes, slug, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image FROM schedules ORDER BY release_date ASC');
       const naRes = await pool.query('SELECT id, slug, movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster, release_date, language, distributor, genre, budget, opening_day_preview, advance_bookings, premiere_collections, weekend_collections, weekly_collections, daily_breakdown, notes, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, robots FROM north_america ORDER BY id ASC');
       const bo5Res = await pool.query('SELECT rank, movie_name, gross, verdict, trend, slug, seo_title, meta_description, meta_keywords, canonical_url FROM box_office_top5 ORDER BY rank ASC');
@@ -54,7 +54,8 @@ router.get('/db', requireAdminPasscode, async (req, res) => {
           closeTimer: popupRes.rows[0].close_timer,
           autoClose: popupRes.rows[0].auto_close,
           displayRule: popupRes.rows[0].display_rule,
-          displayDelay: popupRes.rows[0].display_delay
+          displayDelay: popupRes.rows[0].display_delay,
+          carouselItems: typeof popupRes.rows[0].carousel_items === 'string' ? JSON.parse(popupRes.rows[0].carousel_items) : popupRes.rows[0].carousel_items
         } : { active: false },
         upcomingSchedules: schedulesRes.rows.map(r => ({
           id: r.id,
@@ -341,7 +342,7 @@ router.get('/popup-ad', async (req, res) => {
           autoClose: ad.auto_close,
           displayRule: ad.display_rule,
           displayDelay: ad.display_delay,
-          carouselItems: ad.carousel_items || []
+          carouselItems: typeof ad.carousel_items === 'string' ? JSON.parse(ad.carousel_items) : (ad.carousel_items || [])
         });
       }
     } catch (e) {

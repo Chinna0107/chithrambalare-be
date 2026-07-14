@@ -28,9 +28,9 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage: storage });
 
-const { requireAdminPasscode } = require('../middlewares/auth.js');
+const { requireEmployeeOrAdmin } = require('../middlewares/auth.js');
 
-router.post('/', requireAdminPasscode, (req, res) => {
+router.post('/', requireEmployeeOrAdmin, (req, res) => {
   upload.single('image')(req, res, (err) => {
     if (err) {
       console.error('Upload Error:', err.message || err);
@@ -53,7 +53,7 @@ router.post('/', requireAdminPasscode, (req, res) => {
   });
 });
 
-router.post('/multiple', requireAdminPasscode, (req, res) => {
+router.post('/multiple', requireEmployeeOrAdmin, (req, res) => {
   upload.array('images', 20)(req, res, (err) => {
     if (err) {
       console.error('Upload Multiple Error:', err.message || err);

@@ -5,7 +5,7 @@ const cheerio = require('cheerio');
 const { pool, readDb, writeDb } = require('../config/db.js');
 const { fetchTollywoodImageByKeyword, axiosConfig } = require('../utils/helpers.js');
 
-const { requireAdminPasscode } = require('../middlewares/auth.js');
+const { requireEmployeeOrAdmin } = require('../middlewares/auth.js');
 
 router.get('/warmup', (req, res) => {
   res.json({ status: 'warm', time: new Date() });
@@ -212,7 +212,7 @@ router.get('/schedules/:slug', async (req, res) => {
   return res.json(item);
 });
 
-router.post('/schedules', requireAdminPasscode, async (req, res) => {
+router.post('/schedules', requireEmployeeOrAdmin, async (req, res) => {
   const list = req.body;
   if (pool) {
     try {
@@ -325,7 +325,7 @@ router.get('/north-america/:slug', async (req, res) => {
   return res.json(item);
 });
 
-router.post('/north-america', requireAdminPasscode, async (req, res) => {
+router.post('/north-america', requireEmployeeOrAdmin, async (req, res) => {
   const list = req.body;
   if (pool) {
     try {
@@ -413,7 +413,7 @@ router.get('/box-office-top5', async (req, res) => {
   res.json(db.boxOfficeTop5 || []);
 });
 
-router.post('/box-office-top5', requireAdminPasscode, async (req, res) => {
+router.post('/box-office-top5', requireEmployeeOrAdmin, async (req, res) => {
   const list = req.body;
   if (pool) {
     try {
@@ -480,7 +480,7 @@ router.get('/galleries', async (req, res) => {
   res.json(db.galleries || []);
 });
 
-router.post('/galleries', requireAdminPasscode, async (req, res) => {
+router.post('/galleries', requireEmployeeOrAdmin, async (req, res) => {
   const list = req.body;
   if (pool) {
     try {
@@ -524,7 +524,7 @@ router.post('/galleries', requireAdminPasscode, async (req, res) => {
 });
 
 // Individual schedule CRUD
-router.post('/schedules/single', requireAdminPasscode, async (req, res) => {
+router.post('/schedules/single', requireEmployeeOrAdmin, async (req, res) => {
   const { movieName, releaseDate, remainingDays, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
   if (pool) {
     try {
@@ -544,7 +544,7 @@ router.post('/schedules/single', requireAdminPasscode, async (req, res) => {
   res.json({ success: true, item: newItem });
 });
 
-router.put('/schedules/:id', requireAdminPasscode, async (req, res) => {
+router.put('/schedules/:id', requireEmployeeOrAdmin, async (req, res) => {
   const { id } = req.params;
   const { movieName, releaseDate, remainingDays, language, status, banner, director, castList, genre, releaseStatus, trailerLink, notes, seoTitle, metaDescription, metaKeywords, slug, canonicalUrl, ogTitle, ogDescription, ogImage } = req.body;
   if (pool) {
@@ -563,7 +563,7 @@ router.put('/schedules/:id', requireAdminPasscode, async (req, res) => {
   res.json({ success: true });
 });
 
-router.delete('/schedules/:id', requireAdminPasscode, async (req, res) => {
+router.delete('/schedules/:id', requireEmployeeOrAdmin, async (req, res) => {
   const { id } = req.params;
   if (pool) {
     try {
@@ -578,7 +578,7 @@ router.delete('/schedules/:id', requireAdminPasscode, async (req, res) => {
 });
 
 // Individual north-america CRUD
-router.post('/north-america/single', requireAdminPasscode, async (req, res) => {
+router.post('/north-america/single', requireEmployeeOrAdmin, async (req, res) => {
   const b = req.body;
   if (pool) {
     try {
@@ -597,7 +597,7 @@ router.post('/north-america/single', requireAdminPasscode, async (req, res) => {
   res.json({ success: true });
 });
 
-router.put('/north-america/:id', requireAdminPasscode, async (req, res) => {
+router.put('/north-america/:id', requireEmployeeOrAdmin, async (req, res) => {
   const { id } = req.params;
   const b = req.body;
   if (pool) {
@@ -616,7 +616,7 @@ router.put('/north-america/:id', requireAdminPasscode, async (req, res) => {
   res.json({ success: true });
 });
 
-router.delete('/north-america/:id', requireAdminPasscode, async (req, res) => {
+router.delete('/north-america/:id', requireEmployeeOrAdmin, async (req, res) => {
   const { id } = req.params;
   if (pool) {
     try { await pool.query('DELETE FROM north_america WHERE id=$1', [id]); return res.json({ success: true }); }
@@ -629,7 +629,7 @@ router.delete('/north-america/:id', requireAdminPasscode, async (req, res) => {
 });
 
 // Individual gallery CRUD
-router.post('/galleries/single', requireAdminPasscode, async (req, res) => {
+router.post('/galleries/single', requireEmployeeOrAdmin, async (req, res) => {
   const b = req.body;
   if (pool) {
     try {
@@ -648,7 +648,7 @@ router.post('/galleries/single', requireAdminPasscode, async (req, res) => {
   res.json({ success: true });
 });
 
-router.put('/galleries/:id', requireAdminPasscode, async (req, res) => {
+router.put('/galleries/:id', requireEmployeeOrAdmin, async (req, res) => {
   const { id } = req.params;
   const b = req.body;
   if (pool) {
@@ -667,7 +667,7 @@ router.put('/galleries/:id', requireAdminPasscode, async (req, res) => {
   res.json({ success: true });
 });
 
-router.delete('/galleries/:id', requireAdminPasscode, async (req, res) => {
+router.delete('/galleries/:id', requireEmployeeOrAdmin, async (req, res) => {
   const { id } = req.params;
   if (pool) {
     try { await pool.query('DELETE FROM galleries WHERE id=$1', [id]); return res.json({ success: true }); }

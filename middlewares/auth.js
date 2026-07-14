@@ -1,5 +1,8 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { pool, readDb } = require('../config/db.js');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_tolly_key';
 
 const requireAdminPasscode = async (req, res, next) => {
   const code = req.headers['x-admin-passcode'];
@@ -46,6 +49,35 @@ const requireAdminPasscode = async (req, res, next) => {
   }
 };
 
+const requireEmployeeOrAdmin = async (req, res, next) => {
+  // First check if it's admin
+  const code = req.headers['x-admin-passcode'];
+  if (code) {
+    // We can just call requireAdminPasscode's logic, but since it's middleware we just do it inline
+    return requireAdminPasscode(req, res, next);
+  }
+
+  // Then check employee token
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Unauthorized: No credentials provided' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: Malformed token' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // { id, username, role }
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+  }
+};
+
 module.exports = {
-  requireAdminPasscode
+  requireAdminPasscode,
+  requireEmployeeOrAdmin
 };
