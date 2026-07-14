@@ -11,6 +11,7 @@ const uploadRoutes = require('./upload.js');
 const seoRoutes = require('./seo.js');
 const employeesRoutes = require('./employees.js');
 const teluguNewsRoutes = require('./teluguNews.js');
+const shareRoutes = require('./share.js');
 
 router.use('/articles', articlesRoutes);
 router.use('/reviews', reviewsRoutes);
@@ -21,6 +22,7 @@ router.use('/upload', uploadRoutes);
 router.use('/seo', seoRoutes);
 router.use('/employees', employeesRoutes);
 router.use('/telugu-news', teluguNewsRoutes);
+router.use('/share', shareRoutes);
 // Mount admin routes at root so frontend can access: /api/verify, /api/db, /api/db/reset,
 // /api/settings, /api/popup-ad without the /admin prefix
 router.use('/', adminRoutes);
