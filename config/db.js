@@ -466,6 +466,7 @@ const initDb = async () => {
       "ALTER TABLE galleries ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0",
       "ALTER TABLE galleries ADD COLUMN IF NOT EXISTS seo_title TEXT",
       "ALTER TABLE galleries ADD COLUMN IF NOT EXISTS meta_description TEXT",
+      "ALTER TABLE galleries ADD COLUMN IF NOT EXISTS meta_keywords TEXT",
       "ALTER TABLE galleries ADD COLUMN IF NOT EXISTS slug TEXT",
       "ALTER TABLE galleries ADD COLUMN IF NOT EXISTS canonical_url TEXT",
       "ALTER TABLE galleries ADD COLUMN IF NOT EXISTS og_image TEXT",

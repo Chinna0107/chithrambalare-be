@@ -44,6 +44,18 @@ router.get('/stats', async (req, res) => {
           pool.query('SELECT COUNT(*) FROM reviews WHERE date >= $1', [todayStr])
         ]);
         return res.json({ total: parseInt(totalRes.rows[0].count), today: parseInt(todayRes.rows[0].count) });
+      } else if (type === 'telugu-news') {
+        const [totalRes, todayRes] = await Promise.all([
+          pool.query('SELECT COUNT(*) FROM telugu_news'),
+          pool.query('SELECT COUNT(*) FROM telugu_news WHERE date >= $1', [todayStr])
+        ]);
+        return res.json({ total: parseInt(totalRes.rows[0].count), today: parseInt(todayRes.rows[0].count) });
+      } else if (type === 'box-office') {
+        const [totalRes, todayRes] = await Promise.all([
+          pool.query("SELECT COUNT(*) FROM articles WHERE category ILIKE '%Box Office%'"),
+          pool.query("SELECT COUNT(*) FROM articles WHERE date >= $1 AND category ILIKE '%Box Office%'", [todayStr])
+        ]);
+        return res.json({ total: parseInt(totalRes.rows[0].count), today: parseInt(todayRes.rows[0].count) });
       }
     }
 
@@ -52,6 +64,8 @@ router.get('/stats', async (req, res) => {
     if (type === 'movie-news') items = db.articles || [];
     else if (type === 'ott') items = (db.articles || []).filter(a => a.category?.toLowerCase().includes('ott') || (a.tags || []).some(t => t.toLowerCase().includes('ott')));
     else if (type === 'reviews') items = db.reviews || [];
+    else if (type === 'telugu-news') items = db.teluguNews || [];
+    else if (type === 'box-office') items = (db.articles || []).filter(a => a.category?.toLowerCase().includes('box office'));
 
     const todayCount = items.filter(i => i.date && new Date(i.date) >= todayStart).length;
     return res.json({ total: items.length, today: todayCount });
@@ -391,7 +405,7 @@ router.post('/north-america', requireEmployeeOrAdmin, async (req, res) => {
 router.get('/box-office-top5', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated FROM box_office_top5 ORDER BY rank ASC');
+      const result = await pool.query('SELECT * FROM box_office_top5 ORDER BY rank ASC');
       const top5 = result.rows.map(r => ({
         rank: r.rank,
         movieName: r.movie_name,
@@ -402,7 +416,12 @@ router.get('/box-office-top5', async (req, res) => {
         weekendCollection: r.weekend_collection,
         totalCollection: r.total_collection,
         territory: r.territory,
-        lastUpdated: r.last_updated
+        lastUpdated: r.last_updated,
+        slug: r.slug,
+        seoTitle: r.seo_title,
+        metaDescription: r.meta_description,
+        metaKeywords: r.meta_keywords,
+        canonicalUrl: r.canonical_url
       }));
       return res.json(top5);
     } catch (e) {
@@ -424,7 +443,7 @@ router.post('/box-office-top5', requireEmployeeOrAdmin, async (req, res) => {
           [b.rank, b.movieName, b.gross, b.verdict, b.trend, b.openingCollection, b.weekendCollection, b.totalCollection, b.territory, b.lastUpdated, b.slug, b.seoTitle, b.metaDescription, b.metaKeywords, b.canonicalUrl]
         );
       }
-      const result = await pool.query('SELECT rank, movie_name, gross, verdict, trend, opening_collection, weekend_collection, total_collection, territory, last_updated FROM box_office_top5 ORDER BY rank ASC');
+      const result = await pool.query('SELECT * FROM box_office_top5 ORDER BY rank ASC');
       return res.json({
         success: true,
         boxOfficeTop5: result.rows.map(r => ({
@@ -463,13 +482,20 @@ router.post('/box-office-top5', requireEmployeeOrAdmin, async (req, res) => {
 router.get('/galleries', async (req, res) => {
   if (pool) {
     try {
-      const result = await pool.query('SELECT id, title, cover_image, images, date FROM galleries ORDER BY id ASC');
+      const result = await pool.query('SELECT * FROM galleries ORDER BY id ASC');
       const galleries = result.rows.map(r => ({
         id: r.id,
         title: r.title,
         coverImage: r.cover_image,
         images: typeof r.images === 'string' ? JSON.parse(r.images) : r.images,
-        date: r.date
+        date: r.date,
+        category: r.category,
+        slug: r.slug,
+        seoTitle: r.seo_title,
+        metaDescription: r.meta_description,
+        metaKeywords: r.meta_keywords,
+        canonicalUrl: r.canonical_url,
+        ogImage: r.og_image
       }));
       return res.json(galleries);
     } catch (e) {
@@ -487,11 +513,11 @@ router.post('/galleries', requireEmployeeOrAdmin, async (req, res) => {
       await pool.query('DELETE FROM galleries');
       for (const g of list) {
         await pool.query(
-          'INSERT INTO galleries (title, cover_image, images, date, slug, seo_title, meta_description, alt_text, canonical_url, og_image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-          [g.title, g.coverImage, JSON.stringify(g.images || []), g.date || new Date().toISOString(), g.slug, g.seoTitle, g.metaDescription, g.altText, g.canonicalUrl, g.ogImage]
+          'INSERT INTO galleries (title, cover_image, images, date, category, slug, seo_title, meta_description, meta_keywords, canonical_url, og_image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+          [g.title, g.coverImage, JSON.stringify(g.images || []), g.date || new Date().toISOString(), g.category || 'Stills', g.slug, g.seoTitle, g.metaDescription, g.metaKeywords, g.canonicalUrl, g.ogImage]
         );
       }
-      const result = await pool.query('SELECT id, title, cover_image, images, date FROM galleries ORDER BY id ASC');
+      const result = await pool.query('SELECT * FROM galleries ORDER BY id ASC');
       return res.json({
         success: true,
         galleries: result.rows.map(r => ({
@@ -500,10 +526,11 @@ router.post('/galleries', requireEmployeeOrAdmin, async (req, res) => {
           coverImage: r.cover_image,
           images: typeof r.images === 'string' ? JSON.parse(r.images) : r.images,
           date: r.date,
+          category: r.category,
           slug: r.slug,
           seoTitle: r.seo_title,
           metaDescription: r.meta_description,
-          altText: r.alt_text,
+          metaKeywords: r.meta_keywords,
           canonicalUrl: r.canonical_url,
           ogImage: r.og_image
         }))
@@ -634,9 +661,9 @@ router.post('/galleries/single', requireEmployeeOrAdmin, async (req, res) => {
   if (pool) {
     try {
       const result = await pool.query(
-        `INSERT INTO galleries (title, cover_image, images, date, category, alt_text, caption, photographer_credit, featured_image, sort_order, seo_title, meta_description, slug, canonical_url, og_image)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-        [b.title, b.coverImage, JSON.stringify(b.images || []), b.date || new Date().toISOString(), b.category || 'stills', b.altText, b.caption, b.photographerCredit, b.featuredImage, b.sortOrder || 0, b.seoTitle, b.metaDescription, b.slug, b.canonicalUrl, b.ogImage]
+        `INSERT INTO galleries (title, cover_image, images, date, category, alt_text, caption, photographer_credit, featured_image, sort_order, seo_title, meta_description, meta_keywords, slug, canonical_url, og_image)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        [b.title, b.coverImage, JSON.stringify(b.images || []), b.date || new Date().toISOString(), b.category || 'Stills', b.altText, b.caption, b.photographerCredit, b.featuredImage, b.sortOrder || 0, b.seoTitle, b.metaDescription, b.metaKeywords, b.slug, b.canonicalUrl, b.ogImage]
       );
       return res.json({ success: true, item: result.rows[0] });
     } catch (e) { console.error('PG gallery add failed:', e.message); return res.status(500).json({ error: 'Failed to add gallery' }); }

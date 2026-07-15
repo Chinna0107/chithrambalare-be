@@ -23,7 +23,10 @@ router.get('/', async (req, res) => {
       
       if (category) {
         params.push(`%${category.toLowerCase().trim()}%`);
-        conditions.push(`(LOWER(category) LIKE $${params.length} OR LOWER(tags::text) LIKE $${params.length})`);
+        conditions.push(`(LOWER(category) LIKE $${params.length})`);
+      } else {
+        // Exclude Box Office articles from default feed
+        conditions.push(`(LOWER(category) NOT LIKE '%box office%' OR category IS NULL)`);
       }
       
       if (search) {
@@ -66,7 +69,12 @@ router.get('/', async (req, res) => {
   let posts = db.articles || [];
   if (category) {
     const cat = category.toLowerCase().trim();
-    posts = posts.filter(p => p.category.toLowerCase().includes(cat) || p.tags.some(t => t.toLowerCase().includes(cat)));
+    posts = posts.filter(a => 
+      (a.category && a.category.toLowerCase().includes(cat))
+    );
+  } else {
+    // Exclude Box Office from local fallback default feed
+    posts = posts.filter(a => !a.category || !a.category.toLowerCase().includes('box office'));
   }
   if (search) {
     const s = search.toLowerCase().trim();
