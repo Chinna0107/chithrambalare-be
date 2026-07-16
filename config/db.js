@@ -26,6 +26,7 @@ const readDb = () => {
         comments: [],
         mediaLibrary: [],
         visitorLogs: [],
+        liveUpdates: [],
         analytics: {
           totalVisitors: '1.2M',
           dailyVisitors: '45.2K',
@@ -208,6 +209,34 @@ const initDb = async () => {
         category TEXT,
         author TEXT,
         tags JSONB
+      );
+      CREATE TABLE IF NOT EXISTS live_updates (
+        id TEXT PRIMARY KEY,
+        slug TEXT UNIQUE,
+        title TEXT,
+        excerpt TEXT,
+        content JSONB,
+        thumbnail TEXT,
+        featured_image TEXT,
+        date TEXT,
+        category TEXT,
+        author TEXT,
+        tags JSONB,
+        show_above_banner BOOLEAN DEFAULT false,
+        views INTEGER DEFAULT 0,
+        seo_title TEXT,
+        meta_description TEXT,
+        focus_keyword TEXT,
+        meta_keywords TEXT,
+        canonical_url TEXT,
+        og_title TEXT,
+        og_description TEXT,
+        og_image TEXT,
+        twitter_card TEXT,
+        schema_markup JSONB,
+        breadcrumb TEXT,
+        robots TEXT DEFAULT 'index,follow',
+        status TEXT DEFAULT 'published'
       );
       CREATE TABLE IF NOT EXISTS reviews (
         id TEXT PRIMARY KEY,
@@ -611,6 +640,30 @@ const initDb = async () => {
             a.category,
             a.author,
             JSON.stringify(a.tags)
+          ]
+        );
+      }
+    }
+
+    // 6.1 Seed live_updates
+    const luCheck = await pool.query('SELECT COUNT(*) FROM live_updates');
+    if (parseInt(luCheck.rows[0].count) === 0 && defaultData.liveUpdates) {
+      for (const a of defaultData.liveUpdates) {
+        await pool.query(
+          'INSERT INTO live_updates (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, show_above_banner) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT DO NOTHING',
+          [
+            String(a.id || a.slug),
+            a.slug,
+            a.title,
+            a.excerpt,
+            JSON.stringify(a.content),
+            a.thumbnail,
+            a.featuredImage,
+            a.date,
+            a.category,
+            a.author,
+            JSON.stringify(a.tags),
+            a.showAboveBanner || false
           ]
         );
       }

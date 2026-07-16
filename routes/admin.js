@@ -20,6 +20,7 @@ router.get('/db', requireEmployeeOrAdmin, async (req, res) => {
       const bo5Res = await pool.query('SELECT * FROM box_office_top5 ORDER BY rank ASC');
       const galleriesRes = await pool.query('SELECT * FROM galleries ORDER BY id ASC');
       const articlesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots FROM articles ORDER BY date DESC');
+      const liveUpdatesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots, show_above_banner FROM live_updates ORDER BY date DESC');
       const reviewsRes = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status, views, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, robots FROM reviews ORDER BY date DESC');
       const boRes = await pool.query('SELECT * FROM box_office ORDER BY date DESC');
       const taxonomyRes = await pool.query('SELECT id, type, name, slug, description FROM taxonomy ORDER BY id ASC');
@@ -172,6 +173,33 @@ router.get('/db', requireEmployeeOrAdmin, async (req, res) => {
           schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup,
           breadcrumb: r.breadcrumb,
           robots: r.robots
+        })),
+        liveUpdates: liveUpdatesRes.rows.map(r => ({
+          id: r.id,
+          slug: r.slug,
+          title: r.title,
+          excerpt: r.excerpt,
+          content: r.content,
+          thumbnail: r.thumbnail,
+          featuredImage: r.featured_image,
+          date: r.date,
+          category: r.category,
+          author: r.author,
+          tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags,
+          views: r.views || 0,
+          seoTitle: r.seo_title,
+          metaDescription: r.meta_description,
+          focusKeyword: r.focus_keyword,
+          metaKeywords: r.meta_keywords,
+          canonicalUrl: r.canonical_url,
+          ogTitle: r.og_title,
+          ogDescription: r.og_description,
+          ogImage: r.og_image,
+          twitterCard: r.twitter_card,
+          schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup,
+          breadcrumb: r.breadcrumb,
+          robots: r.robots,
+          showAboveBanner: r.show_above_banner
         })),
         reviews: reviewsRes.rows.map(r => ({
           id: r.id,

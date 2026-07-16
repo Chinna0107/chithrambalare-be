@@ -12,8 +12,10 @@ const seoRoutes = require('./seo.js');
 const employeesRoutes = require('./employees.js');
 const teluguNewsRoutes = require('./teluguNews.js');
 const shareRoutes = require('./share.js');
+const liveUpdatesRoutes = require('./liveUpdates.js');
 
 router.use('/articles', articlesRoutes);
+router.use('/live-updates', liveUpdatesRoutes);
 router.use('/reviews', reviewsRoutes);
 router.use('/box-office', boxOfficeRoutes);
 router.use('/admin', adminRoutes);
