@@ -20,7 +20,7 @@ router.get('/db', requireEmployeeOrAdmin, async (req, res) => {
       const bo5Res = await pool.query('SELECT * FROM box_office_top5 ORDER BY rank ASC');
       const galleriesRes = await pool.query('SELECT * FROM galleries ORDER BY id ASC');
       const articlesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots FROM articles ORDER BY date DESC');
-      const liveUpdatesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots, show_above_banner FROM live_updates ORDER BY date DESC');
+      const liveUpdatesRes = await pool.query('SELECT id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots, show_above_banner, status, timeline_events FROM live_updates ORDER BY date DESC');
       const reviewsRes = await pool.query('SELECT id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date, director, producer, production_house, language, genre, release_date, runtime, trailer, status, views, seo_title, meta_description, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, robots FROM reviews ORDER BY date DESC');
       const boRes = await pool.query('SELECT * FROM box_office ORDER BY date DESC');
       const taxonomyRes = await pool.query('SELECT id, type, name, slug, description FROM taxonomy ORDER BY id ASC');
@@ -177,7 +177,9 @@ router.get('/db', requireEmployeeOrAdmin, async (req, res) => {
         liveUpdates: liveUpdatesRes.rows.map(r => ({
           id: r.id,
           slug: r.slug,
+          status: r.status,
           title: r.title,
+          timelineEvents: typeof r.timeline_events === 'string' ? JSON.parse(r.timeline_events) : r.timeline_events || [],
           excerpt: r.excerpt,
           content: r.content,
           thumbnail: r.thumbnail,

@@ -121,7 +121,7 @@ router.get('/:slug', async (req, res) => {
 
   if (pool) {
     try {
-      const result = await pool.query('UPDATE live_updates SET views = COALESCE(views, 0) + 1 WHERE slug = $1 RETURNING id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots, show_above_banner', [slug]);
+      const result = await pool.query('UPDATE live_updates SET views = COALESCE(views, 0) + 1 WHERE slug = $1 RETURNING id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, views, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots, show_above_banner, timeline_events', [slug]);
       if (result.rows.length > 0) {
         const r = result.rows[0];
         return res.json({
@@ -129,7 +129,8 @@ router.get('/:slug', async (req, res) => {
           content: r.content,
           thumbnail: r.thumbnail, featuredImage: r.featured_image, date: r.date,
           category: r.category, author: r.author, tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags, views: r.views || 0,
-          seoTitle: r.seo_title, metaDescription: r.meta_description, focusKeyword: r.focus_keyword, metaKeywords: r.meta_keywords, canonicalUrl: r.canonical_url, ogTitle: r.og_title, ogDescription: r.og_description, ogImage: r.og_image, twitterCard: r.twitter_card, schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup, breadcrumb: r.breadcrumb, robots: r.robots, showAboveBanner: r.show_above_banner
+          seoTitle: r.seo_title, metaDescription: r.meta_description, focusKeyword: r.focus_keyword, metaKeywords: r.meta_keywords, canonicalUrl: r.canonical_url, ogTitle: r.og_title, ogDescription: r.og_description, ogImage: r.og_image, twitterCard: r.twitter_card, schemaMarkup: typeof r.schema_markup === 'string' ? JSON.parse(r.schema_markup) : r.schema_markup, breadcrumb: r.breadcrumb, robots: r.robots, showAboveBanner: r.show_above_banner,
+          timelineEvents: typeof r.timeline_events === 'string' ? JSON.parse(r.timeline_events) : (r.timeline_events || [])
         });
       }
     } catch (e) {
@@ -188,8 +189,8 @@ router.post('/', requireEmployeeOrAdmin, async (req, res) => {
   const newId = a.id ? String(a.id) : Date.now().toString();
   if (pool) {
     try {
-      await pool.query('INSERT INTO live_updates (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots, show_above_banner) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)',
-        [ newId, a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), a.seoTitle, a.metaDescription, a.focusKeyword, a.metaKeywords, a.canonicalUrl, a.ogTitle, a.ogDescription, a.ogImage, a.twitterCard, JSON.stringify(a.schemaMarkup || {}), a.breadcrumb, a.robots || 'index,follow', a.showAboveBanner === true || String(a.showAboveBanner).toLowerCase() === 'true' ]);
+      await pool.query('INSERT INTO live_updates (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, seo_title, meta_description, focus_keyword, meta_keywords, canonical_url, og_title, og_description, og_image, twitter_card, schema_markup, breadcrumb, robots, show_above_banner, timeline_events) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)',
+        [ newId, a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), a.seoTitle, a.metaDescription, a.focusKeyword, a.metaKeywords, a.canonicalUrl, a.ogTitle, a.ogDescription, a.ogImage, a.twitterCard, JSON.stringify(a.schemaMarkup || {}), a.breadcrumb, a.robots || 'index,follow', a.showAboveBanner === true || String(a.showAboveBanner).toLowerCase() === 'true', JSON.stringify(a.timelineEvents || []) ]);
       return res.json({ success: true, id: newId });
     } catch (e) {
       console.error('PG Live Update insert failed:', e.message);
@@ -207,10 +208,11 @@ router.post('/', requireEmployeeOrAdmin, async (req, res) => {
 // Admin: Edit Single (with rowCount check)
 router.put('/:id', requireEmployeeOrAdmin, async (req, res) => {
   const id = req.params.id; const a = req.body;
+  console.log('UPDATING LIVE UPDATE:', id, 'TIMELINE EVENTS:', a.timelineEvents);
   if (pool) {
     try {
-      const result = await pool.query('UPDATE live_updates SET slug=$1, title=$2, excerpt=$3, content=$4, thumbnail=$5, featured_image=$6, date=$7, category=$8, author=$9, tags=$10, seo_title=$11, meta_description=$12, focus_keyword=$13, meta_keywords=$14, canonical_url=$15, og_title=$16, og_description=$17, og_image=$18, twitter_card=$19, schema_markup=$20, breadcrumb=$21, robots=$22, show_above_banner=$23 WHERE id=$24',
-        [ a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), a.seoTitle, a.metaDescription, a.focusKeyword, a.metaKeywords, a.canonicalUrl, a.ogTitle, a.ogDescription, a.ogImage, a.twitterCard, JSON.stringify(a.schemaMarkup || {}), a.breadcrumb, a.robots || 'index,follow', a.showAboveBanner === true || String(a.showAboveBanner).toLowerCase() === 'true', id ]);
+      const result = await pool.query('UPDATE live_updates SET slug=$1, title=$2, excerpt=$3, content=$4, thumbnail=$5, featured_image=$6, date=$7, category=$8, author=$9, tags=$10, seo_title=$11, meta_description=$12, focus_keyword=$13, meta_keywords=$14, canonical_url=$15, og_title=$16, og_description=$17, og_image=$18, twitter_card=$19, schema_markup=$20, breadcrumb=$21, robots=$22, show_above_banner=$23, status=$24, timeline_events=$25 WHERE id=$26',
+        [ a.slug, a.title, a.excerpt, JSON.stringify(a.content || ''), a.thumbnail, a.featuredImage, a.date || new Date().toISOString(), a.category, a.author, JSON.stringify(a.tags || []), a.seoTitle, a.metaDescription, a.focusKeyword, a.metaKeywords, a.canonicalUrl, a.ogTitle, a.ogDescription, a.ogImage, a.twitterCard, JSON.stringify(a.schemaMarkup || {}), a.breadcrumb, a.robots || 'index,follow', a.showAboveBanner === true || String(a.showAboveBanner).toLowerCase() === 'true', a.status || 'published', JSON.stringify(a.timelineEvents || []), id ]);
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Live Update not found' });
       }
