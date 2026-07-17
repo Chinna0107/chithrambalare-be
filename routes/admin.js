@@ -321,8 +321,65 @@ router.get('/db', requireEmployeeOrAdmin, async (req, res) => {
           fileType: r.file_type,
           size: r.size,
           date: r.date
-        })),
-        analytics: analyticsRes.rows[0] ? {
+        }))
+      };
+
+      // Compute dynamic recent activity
+      let dynamicActivities = [];
+      if (articlesRes.rows && articlesRes.rows.length > 0) {
+        const latestArticle = articlesRes.rows[0];
+        dynamicActivities.push({
+          user: latestArticle.author || 'Admin',
+          action: `published a new article: ${latestArticle.title}`,
+          time: new Date(latestArticle.date || Date.now()).toISOString(),
+          color: 'bg-blue-500/20',
+          type: 'article'
+        });
+      }
+      if (reviewsRes.rows && reviewsRes.rows.length > 0) {
+        const latestReview = reviewsRes.rows[0];
+        dynamicActivities.push({
+          user: 'Admin',
+          action: `published a review for ${latestReview.movie_name || latestReview.title}`,
+          time: new Date(latestReview.date || Date.now()).toISOString(),
+          color: 'bg-yellow-500/20',
+          type: 'review'
+        });
+      }
+      if (galleriesRes.rows && galleriesRes.rows.length > 0) {
+        const latestGallery = galleriesRes.rows[0];
+        const count = typeof latestGallery.images === 'string' ? JSON.parse(latestGallery.images).length : (latestGallery.images?.length || 0);
+        dynamicActivities.push({
+          user: 'Admin',
+          action: `uploaded ${count} gallery images for ${latestGallery.title}`,
+          time: new Date(latestGallery.date || Date.now()).toISOString(),
+          color: 'bg-purple-500/20',
+          type: 'gallery'
+        });
+      }
+      if (boRes.rows && boRes.rows.length > 0) {
+        const latestBo = boRes.rows[0];
+        dynamicActivities.push({
+          user: 'Admin',
+          action: `updated box office data for ${latestBo.movie_name}`,
+          time: new Date(latestBo.date || latestBo.release_date || Date.now()).toISOString(),
+          color: 'bg-red-500/20',
+          type: 'box-office'
+        });
+      }
+      if (naRes.rows && naRes.rows.length > 0) {
+        const latestNa = naRes.rows[0];
+        dynamicActivities.push({
+          user: 'Admin',
+          action: `updated North America collections for ${latestNa.movie_name}`,
+          time: new Date(latestNa.release_date || Date.now()).toISOString(),
+          color: 'bg-green-500/20',
+          type: 'north-america'
+        });
+      }
+      dynamicActivities.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+      db.analytics = analyticsRes.rows[0] ? {
           totalVisitors: totalVisRes.rows[0].count,
           dailyVisitors: dailyVisRes.rows[0].count,
           weeklyVisitors: weeklyVisRes.rows[0].count,
@@ -332,9 +389,8 @@ router.get('/db', requireEmployeeOrAdmin, async (req, res) => {
           mostViewedArticles: typeof analyticsRes.rows[0].most_viewed_articles === 'string' ? JSON.parse(analyticsRes.rows[0].most_viewed_articles) : analyticsRes.rows[0].most_viewed_articles,
           mostViewedReviews: typeof analyticsRes.rows[0].most_viewed_reviews === 'string' ? JSON.parse(analyticsRes.rows[0].most_viewed_reviews) : analyticsRes.rows[0].most_viewed_reviews,
           topPerformingPages: typeof analyticsRes.rows[0].top_performing_pages === 'string' ? JSON.parse(analyticsRes.rows[0].top_performing_pages) : analyticsRes.rows[0].top_performing_pages,
-          recentActivity: typeof analyticsRes.rows[0].recent_activity === 'string' ? JSON.parse(analyticsRes.rows[0].recent_activity) : analyticsRes.rows[0].recent_activity
-        } : {}
-      };
+          recentActivity: dynamicActivities.length > 0 ? dynamicActivities : (typeof analyticsRes.rows[0].recent_activity === 'string' ? JSON.parse(analyticsRes.rows[0].recent_activity) : analyticsRes.rows[0].recent_activity)
+        } : { recentActivity: dynamicActivities };
       return res.json(db);
     } catch (e) {
       console.error('PG GET /api/admin/db failed:', e.message);

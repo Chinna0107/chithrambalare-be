@@ -236,7 +236,8 @@ const initDb = async () => {
         schema_markup JSONB,
         breadcrumb TEXT,
         robots TEXT DEFAULT 'index,follow',
-        status TEXT DEFAULT 'published'
+        status TEXT DEFAULT 'published',
+        timeline_events JSONB
       );
       CREATE TABLE IF NOT EXISTS reviews (
         id TEXT PRIMARY KEY,
@@ -408,6 +409,8 @@ const initDb = async () => {
       "ALTER TABLE articles ADD COLUMN IF NOT EXISTS auto_saved_at TIMESTAMP",
       "ALTER TABLE articles ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false",
       "ALTER TABLE articles ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0",
+      // live_updates
+      "ALTER TABLE live_updates ADD COLUMN IF NOT EXISTS timeline_events JSONB",
       // reviews
       "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS genre TEXT",
       "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS language TEXT",
@@ -579,177 +582,7 @@ const initDb = async () => {
       }
     }
 
-    // 2. Seed popup_ad
-    const popupCheck = await pool.query('SELECT COUNT(*) FROM popup_ad');
-    if (parseInt(popupCheck.rows[0].count) === 0 && defaultData.popupAd) {
-      const p = defaultData.popupAd;
-      await pool.query(
-        'INSERT INTO popup_ad (active, title, image_desktop, image_mobile, redirect_url, close_timer, auto_close, display_rule, display_delay, carousel_items) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-        [p.active, p.title, p.imageDesktop, p.imageMobile, p.redirectUrl, p.closeTimer, p.autoClose, p.displayRule, p.displayDelay, JSON.stringify(p.carouselItems || [])]
-      );
-    }
-
-    // 3. Seed schedules
-    const schedCheck = await pool.query('SELECT COUNT(*) FROM schedules');
-    if (parseInt(schedCheck.rows[0].count) === 0 && defaultData.upcomingSchedules) {
-      for (const s of defaultData.upcomingSchedules) {
-        await pool.query(
-          'INSERT INTO schedules (movie_name, release_date, language, status) VALUES ($1, $2, $3, $4)',
-          [s.movieName, s.releaseDate, s.language, s.status]
-        );
-      }
-    }
-
-    // 4. Seed north_america
-    const naCheck = await pool.query('SELECT COUNT(*) FROM north_america');
-    if (parseInt(naCheck.rows[0].count) === 0 && defaultData.northAmericaCollections) {
-      for (const n of defaultData.northAmericaCollections) {
-        await pool.query(
-          'INSERT INTO north_america (movie_name, hourly_gross, total_gross, premier_gross, screens, status, last_updated, poster) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-          [n.movieName, n.hourlyGross, n.totalGross, n.premierGross, n.screens, n.status, n.lastUpdated, n.poster]
-        );
-      }
-    }
-
-    // 5. Seed box_office_top5
-    const bo5Check = await pool.query('SELECT COUNT(*) FROM box_office_top5');
-    if (parseInt(bo5Check.rows[0].count) === 0 && defaultData.boxOfficeTop5) {
-      for (const b of defaultData.boxOfficeTop5) {
-        await pool.query(
-          'INSERT INTO box_office_top5 (rank, movie_name, gross, verdict, trend) VALUES ($1, $2, $3, $4, $5)',
-          [b.rank, b.movieName, b.gross, b.verdict, b.trend]
-        );
-      }
-    }
-
-    // 6. Seed articles
-    const artCheck = await pool.query('SELECT COUNT(*) FROM articles');
-    if (parseInt(artCheck.rows[0].count) === 0 && defaultData.articles) {
-      for (const a of defaultData.articles) {
-        await pool.query(
-          'INSERT INTO articles (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING',
-          [
-            String(a.id || a.slug),
-            a.slug,
-            a.title,
-            a.excerpt,
-            JSON.stringify(a.content),
-            a.thumbnail,
-            a.featuredImage,
-            a.date,
-            a.category,
-            a.author,
-            JSON.stringify(a.tags)
-          ]
-        );
-      }
-    }
-
-    // 6.1 Seed live_updates
-    const luCheck = await pool.query('SELECT COUNT(*) FROM live_updates');
-    if (parseInt(luCheck.rows[0].count) === 0 && defaultData.liveUpdates) {
-      for (const a of defaultData.liveUpdates) {
-        await pool.query(
-          'INSERT INTO live_updates (id, slug, title, excerpt, content, thumbnail, featured_image, date, category, author, tags, show_above_banner) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT DO NOTHING',
-          [
-            String(a.id || a.slug),
-            a.slug,
-            a.title,
-            a.excerpt,
-            JSON.stringify(a.content),
-            a.thumbnail,
-            a.featuredImage,
-            a.date,
-            a.category,
-            a.author,
-            JSON.stringify(a.tags),
-            a.showAboveBanner || false
-          ]
-        );
-      }
-    }
-
-    // 7. Seed reviews
-    const revCheck = await pool.query('SELECT COUNT(*) FROM reviews');
-    if (parseInt(revCheck.rows[0].count) === 0 && defaultData.reviews) {
-      for (const r of defaultData.reviews) {
-        await pool.query(
-          'INSERT INTO reviews (id, slug, movie_name, poster, rating, snippet, verdict, story, performances, technical_aspects, verdict_text, ott_platform, ott_release_date, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT DO NOTHING',
-          [
-            String(r.id || r.slug),
-            r.slug,
-            r.movieName,
-            r.poster,
-            r.rating,
-            r.snippet,
-            r.verdict,
-            r.story,
-            r.performances,
-            r.technicalAspects,
-            r.verdictText,
-            r.ottPlatform,
-            r.ottReleaseDate,
-            r.date
-          ]
-        );
-      }
-    }
-
-    // 8. Seed box_office
-    const boCheck = await pool.query('SELECT COUNT(*) FROM box_office');
-    if (parseInt(boCheck.rows[0].count) === 0 && defaultData.boxOffice) {
-      for (const b of defaultData.boxOffice) {
-        await pool.query(
-          'INSERT INTO box_office (id, slug, movie_name, director, movie_cast, poster, day_collection, worldwide_gross, india_net, india_gross, overseas, verdict, trend, days, languages, percentage, date, daily_breakdown, budget, total_india_net, us_premieres) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) ON CONFLICT DO NOTHING',
-          [
-            String(b.id || b.slug),
-            b.slug,
-            b.movieName,
-            b.director,
-            b.cast,
-            b.poster,
-            b.dayCollection,
-            b.worldwideGross,
-            b.indiaNet,
-            b.indiaGross,
-            b.overseas,
-            b.verdict,
-            b.trend,
-            b.days,
-            b.languages,
-            b.percentage,
-            b.date,
-            JSON.stringify(b.dailyBreakdown),
-            b.budget,
-            b.totalIndiaNet,
-            b.usPremieres
-          ]
-        );
-      }
-    }
-
-    // 9. Seed galleries
-    const galCheck = await pool.query('SELECT COUNT(*) FROM galleries');
-    if (parseInt(galCheck.rows[0].count) === 0 && defaultData.galleries) {
-      for (const g of defaultData.galleries) {
-        await pool.query(
-          'INSERT INTO galleries (title, cover_image, images, date) VALUES ($1, $2, $3, $4)',
-          [g.title, g.coverImage || g.image, JSON.stringify(g.images || []), g.date || new Date().toISOString()]
-        );
-      }
-    }
-    // 10. Seed analytics
-    const analyticsCheck = await pool.query('SELECT COUNT(*) FROM analytics');
-    if (parseInt(analyticsCheck.rows[0].count) === 0 && defaultData.analytics) {
-      const a = defaultData.analytics;
-      await pool.query(
-        'INSERT INTO analytics (total_visitors, daily_visitors, weekly_visitors, monthly_visitors, page_views, bounce_rate, most_viewed_articles, most_viewed_reviews, top_performing_pages, recent_activity) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-        [
-          a.totalVisitors, a.dailyVisitors, a.weeklyVisitors, a.monthlyVisitors, a.pageViews, a.bounceRate,
-          JSON.stringify(a.mostViewedArticles), JSON.stringify(a.mostViewedReviews), JSON.stringify(a.topPerformingPages), JSON.stringify(a.recentActivity)
-        ]
-      );
-    }
+    // Removed mock data seeding to only seed settings (super admin)
 
     console.log('PostgreSQL database initialization & seeding successful.');
   } catch (err) {
