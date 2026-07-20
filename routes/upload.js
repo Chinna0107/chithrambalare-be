@@ -13,16 +13,19 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'tolly-images',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-    transformation: (req, file) => {
-      let trans = [{ quality: "auto", fetch_format: "auto" }];
+  params: async (req, file) => {
+    let trans = [];
+    if (file.mimetype.startsWith('image/')) {
+      trans.push({ quality: "auto", fetch_format: "auto" });
       if (req.query.watermark === 'true') {
         trans.push({ overlay: "watermark", gravity: "south_east", opacity: 50, width: 150 });
       }
-      return trans;
     }
+    return {
+      folder: 'tolly-images',
+      resource_type: 'auto',
+      transformation: trans.length > 0 ? trans : undefined
+    };
   },
 });
 

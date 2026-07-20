@@ -25,8 +25,7 @@ router.get('/', async (req, res) => {
         params.push(`%${category.toLowerCase().trim()}%`);
         conditions.push(`(LOWER(category) LIKE $${params.length})`);
       } else {
-        // Exclude Box Office articles from default feed
-        conditions.push(`(LOWER(category) NOT LIKE '%box office%' OR category IS NULL)`);
+        // Include all articles in default feed
       }
       
       if (search) {
@@ -40,7 +39,7 @@ router.get('/', async (req, res) => {
         query += whereClause;
       }
       
-      query += ` ORDER BY date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      query += ` ORDER BY SUBSTRING(date FROM 1 FOR 10) DESC, id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       
       const countResult = await pool.query(countQuery, params);
       const total = parseInt(countResult.rows[0].count);
@@ -73,8 +72,7 @@ router.get('/', async (req, res) => {
       (a.category && a.category.toLowerCase().includes(cat))
     );
   } else {
-    // Exclude Box Office from local fallback default feed
-    posts = posts.filter(a => !a.category || !a.category.toLowerCase().includes('box office'));
+    // Include all articles
   }
   if (search) {
     const s = search.toLowerCase().trim();
