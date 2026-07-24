@@ -22,8 +22,17 @@ router.get('/', async (req, res) => {
       const conditions = [];
       
       if (category) {
-        params.push(`%${category.toLowerCase().trim()}%`);
-        conditions.push(`(LOWER(category) LIKE $${params.length})`);
+        const cats = category.split(',').map(c => c.toLowerCase().trim()).filter(Boolean);
+        if (cats.length === 1) {
+          params.push(`%${cats[0]}%`);
+          conditions.push(`(LOWER(category) LIKE $${params.length})`);
+        } else {
+          const catConditions = cats.map(c => {
+            params.push(`%${c}%`);
+            return `LOWER(category) LIKE $${params.length}`;
+          });
+          conditions.push(`(${catConditions.join(' OR ')})`);
+        }
       } else {
         // Include all articles in default feed
       }
@@ -67,9 +76,9 @@ router.get('/', async (req, res) => {
   const db = readDb();
   let posts = db.articles || [];
   if (category) {
-    const cat = category.toLowerCase().trim();
+    const cats = category.split(',').map(c => c.toLowerCase().trim()).filter(Boolean);
     posts = posts.filter(a => 
-      (a.category && a.category.toLowerCase().includes(cat))
+      a.category && cats.some(cat => a.category.toLowerCase().includes(cat))
     );
   } else {
     // Include all articles

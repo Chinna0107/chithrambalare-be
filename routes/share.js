@@ -5,8 +5,8 @@ const { pool, readDb } = require('../config/db');
 // A real hosted fallback image (served from Cloudinary so it's always accessible)
 const FALLBACK_IMAGE = 'https://res.cloudinary.com/dmsx7md7p/image/upload/v1783962254/tolly-images/pqwr03cpfgci6vwsin3q.jpg';
 
-// Helper: return first non-empty string value from a list of candidates
-const firstVal = (...args) => args.find(v => v && String(v).trim() !== '') || FALLBACK_IMAGE;
+// Helper: return first non-empty string value from a list of candidates, with a custom fallback
+const firstVal = (fallback, ...args) => args.find(v => v && String(v).trim() !== '') || fallback;
 
 // Helper to fetch from DB
 const getItem = async (table, slug) => {
@@ -62,9 +62,10 @@ router.get('/article/:slug', async (req, res) => {
     const article = await getItem('articles', req.params.slug);
     if (!article) return res.status(404).send('Not found');
 
-    const title = firstVal(article.seo_title, article.title, 'ChitramBhalare Article');
-    const desc = firstVal(article.meta_description, article.excerpt, 'Read the latest Tollywood news on ChitramBhalare');
-    const img = firstVal(article.og_image, article.thumbnail, article.featured_image);
+    // Handle both PG snake_case and JSON camelCase property names
+    const title = firstVal('ChitramBhalare Article', article.seo_title, article.seoTitle, article.title);
+    const desc = firstVal('Read the latest Tollywood news on ChitramBhalare', article.meta_description, article.metaDescription, article.excerpt);
+    const img = firstVal(FALLBACK_IMAGE, article.og_image, article.ogImage, article.featured_image, article.featuredImage, article.thumbnail);
     const redirectUrl = `https://chitrambhalare.in/movie-news/${article.slug}`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -80,9 +81,10 @@ router.get('/review/:slug', async (req, res) => {
     const review = await getItem('reviews', req.params.slug);
     if (!review) return res.status(404).send('Not found');
 
-    const title = firstVal(review.seo_title, review.movie_name && `${review.movie_name} Review`, review.title, 'Movie Review');
-    const desc = firstVal(review.meta_description, review.verdict, review.snippet, 'Read the full review on ChitramBhalare');
-    const img = firstVal(review.og_image, review.poster, review.thumbnail);
+    const movieName = review.movie_name || review.movieName;
+    const title = firstVal('Movie Review', review.seo_title, review.seoTitle, movieName && `${movieName} Review`, review.title);
+    const desc = firstVal('Read the full review on ChitramBhalare', review.meta_description, review.metaDescription, review.verdict, review.snippet);
+    const img = firstVal(FALLBACK_IMAGE, review.og_image, review.ogImage, review.poster, review.thumbnail);
     const redirectUrl = `https://chitrambhalare.in/reviews/${review.slug}`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -98,9 +100,9 @@ router.get('/telugu-news/:slug', async (req, res) => {
     const item = await getItem('telugu_news', req.params.slug);
     if (!item) return res.status(404).send('Not found');
 
-    const title = firstVal(item.seo_title, item.title, 'Telugu News');
-    const desc = firstVal(item.meta_description, item.excerpt, 'Read Telugu News on ChitramBhalare');
-    const img = firstVal(item.og_image, item.thumbnail);
+    const title = firstVal('Telugu News', item.seo_title, item.seoTitle, item.title);
+    const desc = firstVal('Read Telugu News on ChitramBhalare', item.meta_description, item.metaDescription, item.excerpt);
+    const img = firstVal(FALLBACK_IMAGE, item.og_image, item.ogImage, item.thumbnail);
     const redirectUrl = `https://chitrambhalare.in/telugu-news/${item.slug}`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
